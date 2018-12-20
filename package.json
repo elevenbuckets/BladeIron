@@ -1,0 +1,32 @@
+{
+  "name": "BladeIron",
+  "version": "1.0.0",
+  "description": "11BE: BladeIron RPC-WS Service",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elevenbuckets/BladeIron.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/elevenbuckets/BladeIron/issues"
+  },
+  "homepage": "https://github.com/elevenbuckets/BladeIron#readme",
+  "dependencies": {
+    "async": "^2.6.1",
+    "accMgr": "git+ssh://git@github.com/elevenbuckets/accmgr.git",
+    "asar": "^0.14.3",
+    "rpc-websockets": "^4.3.5",
+    "ipfs_base": "git+ssh://git@github.com/elevenbuckets/ipfs_go.git",
+    "bignumber.js": "^5.0.0",
+    "buttercup": "^1.6.2",
+    "node-fetch": "^1.7.3",
+    "uuid": "^3.1.0",
+    "web3": "^0.19"
+  }
+}
