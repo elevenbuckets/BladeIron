@@ -85,7 +85,7 @@ class BladeIron {
 
 			this.GasOracle = this.configs.gasOracleAPI || undefined;
                 	this.TokenList = Tokens[this.networkID];
-			this.userWallet = undefined;
+			this.userWallet = {};
                 	this.gasPrice = this.configs.defaultGasPrice || 50000000000;
 			this.qTimeout  = this.configs.queueInterval || 5000;
 		}
@@ -572,9 +572,9 @@ class BladeIron {
 	                return rc.reduce((result, stat) => { return result && (stat === true) });
 	        }
 
-		this.setAccount = addr =>
+		this.setAccount = appName => addr =>
 	        {
-	                this.userWallet = addr;
+	                this.userWallet[appName] = addr;
 	                if (typeof(this.allocated[addr]) === 'undefined') this.allocated[addr] = new BigNumber(0);
 	
 	                return true;
@@ -599,9 +599,10 @@ class BladeIron {
 					jobObjList.map( (job) => 
 					{
 						this.setAccount(job.txObj.from);
-						let userBalance = this.web3.eth.getBalance(this.userWallet); 
+						let jobWallet = this.userWallet[job.type];
+						let userBalance = this.web3.eth.getBalance(jobWallet);
 	
-						console.debug(` - Account: ${this.userWallet}; Balance: ${userBalance} ETH`);
+						console.debug(` - Account: ${jobWallet}; Balance: ${userBalance} ETH`);
 	
 						let gasCost = new BigNumber(job.txObj.gas).times(this.gasPrice); 
 	
@@ -609,7 +610,7 @@ class BladeIron {
 						        typeof(this.TokenList[job.contract]) === 'undefined'
 						     && typeof(job.type) !== 'undefined' 
 						     && job.type === 'Token'
-						     && userBalance.sub(this.allocated[this.userWallet]).gte(gasCost)
+						     && userBalance.sub(this.allocated[jobWallet]).gte(gasCost)
 						) {
 							console.debug(`WARN: Unknown token ${job.contract}, skipping job ...`);
 							return;
@@ -621,22 +622,22 @@ class BladeIron {
 							return;
 						} else if (
 							job.type !== 'Web3' 
-						     && userBalance.sub(this.allocated[this.userWallet]).gte(gasCost) 
+						     && userBalance.sub(this.allocated[jobWallet]).gte(gasCost) 
 						) {
 							console.debug(`INFO: calling ${job.type}.${job.contract}.${job.call}, allocating gas fee from wallet: ${gasCost}`);
-							this.allocated[this.userWallet] = this.allocated[this.userWallet].add(gasCost);
+							this.allocated[jobWallet] = this.allocated[jobWallet].add(gasCost);
 						} else if (
 							job.type === 'Web3' 
-						     && userBalance.sub(this.allocated[this.userWallet]).sub(job.txObj.value).gte(gasCost) 
+						     && userBalance.sub(this.allocated[jobWallet]).sub(job.txObj.value).gte(gasCost) 
 						) {
 							console.debug(`INFO: sending Ether, allocating gas fee ${gasCost} and ether ${job.txObj.value} from wallet`);
-							this.allocated[this.userWallet] = this.allocated[this.userWallet].add(gasCost).add(job.txObj.value);
+							this.allocated[jobWallet] = this.allocated[jobWallet].add(gasCost).add(job.txObj.value);
 						} else {
 							console.warn(`WARN: Insufficient fund in wallet, skipping job ...`);
 							return;
 						}
 	
-						this.enqueue({...job, Q})(this.userWallet);
+						this.enqueue({...job, Q})(jobWallet);
 					})
 
 					this.allocated = {};	
