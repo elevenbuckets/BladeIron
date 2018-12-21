@@ -598,7 +598,7 @@ class BladeIron {
 	
 					jobObjList.map( (job) => 
 					{
-						this.setAccount(job.txObj.from);
+						this.setAccount(job.type)(job.txObj.from);
 						let jobWallet = this.userWallet[job.type];
 						let userBalance = this.web3.eth.getBalance(jobWallet);
 	
