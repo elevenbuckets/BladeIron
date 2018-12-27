@@ -933,6 +933,22 @@ const server = new WSServ({
 server.on('listening', () => { process.send("Ready") });
 // Registering methods
 server.event('connected');
+server.event('ethstats');
+
+let currentBlock = 0;
+
+const observer = (sec = 1001) => 
+{
+	return setInterval(() => 
+	{ 
+		let stat = biapi.ethNetStatus(); 
+		if (stat.blockHeight !== 0 && stat.blockHeight > currentBlock) {
+			server.emit('ethstats', stat);
+		}
+	}, sec);
+}
+
+let serverTimer;
 
 server.register('initialize', (obj) => 
 {
@@ -940,7 +956,9 @@ server.register('initialize', (obj) =>
 	console.dir(obj);
 	biapi.connect().then((rc) => 
 	{
+		 let sec = obj.observe_interval || 1001;
 	         server.emit('connected', biapi.connected());
+		 serverTimer = observer(sec);
         });
 });
 
