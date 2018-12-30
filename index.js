@@ -2,6 +2,8 @@
 
 const WSServ = require('rpc-websockets').Server;
 const Web3   = require('web3');
+const abi  = require('web3-eth-abi');
+const keth = require('keythereum');
 const net    = require('net');
 const os     = require('os');
 const path   = require('path');
@@ -12,6 +14,7 @@ const fetch     = require('node-fetch');
 const ipfsctl = require('ipfsd-ctl');
 const ipfsAPI = require('ipfs-api');
 const { execFileSync } = require('child_process');
+const ethUtils = require('ethereumjs-utils');
 
 // account manager
 const bcup  = require('buttercup');
@@ -40,6 +43,33 @@ const __asar_unpacked = (inPath) => {
         return _fs.existsSync(outPath) ? outPath : inPath;
 }
 
+// Internal functions
+const recover = (address, password, datadir) =>
+{
+        let keyObj;
+
+        try {
+                keyObj = keth.importFromFile(address, datadir);
+        } catch (err) {
+                console.dir(err);
+                return Promise.resolve({rc: false, pkey: {}});
+        }
+
+        const __recovers = (resolve, reject) =>
+        {
+                console.log("Processing " + address);
+                keth.recover(password, keyObj, function(pkey) {
+                        if (pkey.toString() === 'Error: message authentication code mismatch') {
+                                resolve({rc: false, pkey: {}})
+                        } else {
+                                resolve({rc: true, pkey});
+                        }
+                });
+        }
+
+        return new Promise(__recovers);
+}
+
 // BladeIron
 class BladeIron {
 	constructor() 
@@ -62,6 +92,7 @@ class BladeIron {
                         return addr;
                 };
 
+		this.abi  = abi;
 		this.ipc3 = new Web3();
 
 		this.CUE = { 'Web3': { 'ETH': {'sendTransaction': this.web3.eth.sendTransaction } }, 'Token': {} };
@@ -244,6 +275,51 @@ class BladeIron {
 	                        return {blockHeight, blockTime, highestBlock};
 	                }
 	        }
+
+		this.unlockAndSign = addr => (msgSHA256Buffer) =>
+		{
+			let pw = masterpw.get(this).passwd;
+			
+			return this.ds.load(createCredentials.fromPassword(pw)).then( (myArchive) => {
+				let vaults = myArchive.findGroupsByTitle("ElevenBuckets")[0];
+				let passes;
+	
+				try {
+					passes = vaults.findEntriesByProperty('username', addr)[0].getProperty('password');
+				} catch(err) {
+					passes = undefined;
+				}
+		
+		               	if (typeof(passes) === 'undefined' || passes.length == 0) {
+					console.warn("no password provided for address " + addr + ", skipped ...");
+	
+	                        	return {v: null, r: null, s: null, };
+	                	} else {
+					let p = recover(addr, passes, this.configs.datadir);
+					if(!p.rc) throw "failed to unlock account";
+
+                			let chkhash = ethUtils.hashPersonalMessage(msgSHA256Buffer);
+                			let signature = ethUtils.ecsign(chkhash, p.pkey, this.networkID);
+					return signature;
+				}
+			}
+		}
+
+		this.verifySignedMsg = (msgSHA256Buffer) => (v, r, s, signer) =>
+		{
+                	let chkhash = ethUtils.hashPersonalMessage(msgSHA256Buffer);
+			let signer = '0x' +
+		              ethUtils.bufferToHex(
+                		ethUtils.sha3(
+                  			ethUtils.bufferToHex(
+                        			ethUtils.ecrecover(chkhash, v, r, s, this.networkID);
+                  			)
+                		)
+              		).slice(26);
+
+        		//console.log(`signer address: ${signer}`);
+        		return signer === ethUtils.bufferToHex(sigObj.originAddress);
+		}
 
 		this.addrEtherBalance = addr => { return this.web3.eth.getBalance(addr); }
 		this.byte32ToAddress = (b) => { return this.web3.toAddress(this.web3.toHex(this.web3.toBigNumber(String(b)))); };
@@ -997,6 +1073,25 @@ server.register('sendTx', (args) => // sendTx(tokenSymbol, fromWallet, toAddress
 	} catch (err) {
 		return Promise.reject(server.error(404, err));
 	}
+});
+
+server.register('unlockAndSign', (args) =>
+{
+	let address = args[0];
+	let msgbuf  = Buffer.from(args[1]);
+	
+	return biapi.unlockAndSign(address)(msgbuf);
+});
+
+server.register('verifySignedMsg', (args) =>
+{
+	let signer  = args[0]; 
+	let msgbuf  = Buffer.from(args[1]);
+	let v       = args[2];
+	let r       = args[3];
+	let s       = args[4];
+
+	return biapi.verifySignedMsg(msgbuf)(v,r,s,signer);
 });
 
 server.register('getTxObj', (args) => // getTxObj(tokenSymbol, fromWallet, toAddress, amount, gasAmount) 

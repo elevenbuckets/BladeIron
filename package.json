@@ -18,15 +18,18 @@
   },
   "homepage": "https://github.com/elevenbuckets/BladeIron#readme",
   "dependencies": {
-    "async": "^2.6.1",
     "accMgr": "git+ssh://git@github.com/elevenbuckets/accmgr.git",
     "asar": "^0.14.3",
-    "rpc-websockets": "^4.3.5",
-    "ipfs_base": "git+ssh://git@github.com/elevenbuckets/ipfs_go.git",
+    "async": "^2.6.1",
     "bignumber.js": "^5.0.0",
     "buttercup": "^1.6.2",
+    "ethereumjs-utils": "^5.2.5",
+    "ipfs_base": "git+ssh://git@github.com/elevenbuckets/ipfs_go.git",
+    "keythereum": "git+ssh://git@github.com/elevenbuckets/keythereum.git",
     "node-fetch": "^1.7.3",
+    "rpc-websockets": "^4.3.5",
     "uuid": "^3.1.0",
-    "web3": "^0.19"
+    "web3": "^0.19",
+    "web3-eth-abi": "^1.0.0-beta.37"
   }
 }
