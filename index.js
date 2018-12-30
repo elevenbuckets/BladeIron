@@ -944,6 +944,7 @@ const observer = (sec = 1001) =>
 		let stat = biapi.ethNetStatus(); 
 		if (stat.blockHeight !== 0 && stat.blockHeight > currentBlock) {
 			server.emit('ethstats', stat);
+			currentBlock = stat.blockHeight;
 		}
 	}, sec);
 }
@@ -1297,7 +1298,19 @@ server.register('fully_initialize', (obj) =>
 
 	let reqs = 
 	[
-		gethChk ? true : biapi.connect(),
+		gethChk ? true : biapi.connect().then((rc) =>
+	        {
+			try {
+				if (!rc) return rc;
+
+	                	let sec = obj.observe_interval || 1001;
+	                 	server.emit('connected', biapi.connected());
+	                 	serverTimer = observer(sec);
+			} catch(err) {
+				console.log(err);
+				return false;
+			}
+	        }),
 		ipfsChk ? true : ipfsi.start().then(() => { return true; })
 	];
 
