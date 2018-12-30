@@ -302,23 +302,23 @@ class BladeIron {
                 			let signature = ethUtils.ecsign(chkhash, p.pkey, this.networkID);
 					return signature;
 				}
-			}
+			})
 		}
 
 		this.verifySignedMsg = (msgSHA256Buffer) => (v, r, s, signer) =>
 		{
                 	let chkhash = ethUtils.hashPersonalMessage(msgSHA256Buffer);
-			let signer = '0x' +
+			let originAddress = '0x' +
 		              ethUtils.bufferToHex(
                 		ethUtils.sha3(
                   			ethUtils.bufferToHex(
-                        			ethUtils.ecrecover(chkhash, v, r, s, this.networkID);
+                        			ethUtils.ecrecover(chkhash, v, r, s, this.networkID)
                   			)
                 		)
               		).slice(26);
 
         		//console.log(`signer address: ${signer}`);
-        		return signer === ethUtils.bufferToHex(sigObj.originAddress);
+        		return signer === originAddress;
 		}
 
 		this.addrEtherBalance = addr => { return this.web3.eth.getBalance(addr); }
