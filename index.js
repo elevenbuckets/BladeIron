@@ -295,12 +295,13 @@ class BladeIron {
 	
 	                        	return {v: null, r: null, s: null, };
 	                	} else {
-					let p = recover(addr, passes, this.configs.datadir);
-					if(!p.rc) throw "failed to unlock account";
+					return recover(addr, passes, this.configs.datadir).then((p) => {
+						if(!p.rc) throw "failed to unlock account";
 
-                			let chkhash = ethUtils.hashPersonalMessage(msgSHA256Buffer);
-                			let signature = ethUtils.ecsign(chkhash, p.pkey, this.networkID);
-					return signature;
+                				let chkhash = ethUtils.hashPersonalMessage(msgSHA256Buffer);
+                				let signature = ethUtils.ecsign(chkhash, p.pkey, this.networkID);
+						return signature;
+					})
 				}
 			})
 		}
