@@ -1079,7 +1079,7 @@ server.register('sendTx', (args) => // sendTx(tokenSymbol, fromWallet, toAddress
 server.register('unlockAndSign', (args) =>
 {
 	let address = args[0];
-	let msgbuf  = Buffer.from(args[1]);
+	let msgbuf  = Buffer.from(args[1], 'hex');
 	
 	return biapi.unlockAndSign(address)(msgbuf);
 });
@@ -1181,7 +1181,7 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
 	let callArgs = appArgs.map((i) => { return tkObj[i] });
 	let gasAmount = 5;
 
-	if (amount != null) {
+	if (amount === null) {
 		gasAmount = biapi.CUE[type][contract][call].estimateGas(...callArgs, {from: fromWallet, gasPrice: biapi.gasPrice})
 	} else {
 		gasAmount = biapi.CUE[type][contract][call].estimateGas(...callArgs, {from: fromWallet, value: amount, gasPrice: biapi.gasPrice})
