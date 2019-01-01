@@ -1371,13 +1371,14 @@ server.register('ipfs_lspin', () =>
 
 // IPFS PUBSUB related
 server.event('ipfs_pubsub_incomming');
-const __ipfs_pubsub_handler = (msg) => { 
-	return server.emit('ipfs_pubsub_incomming', {topic, msg, timestamp: Date.now()});
-}
+let __ipfs_pubsub_handler;
 
 server.register('ipfs_pubsub_subscribe', (args) => 
 {	
 	let topic = args[0];
+	__ipfs_pubsub_handler = (msg) => { 
+		return server.emit('ipfs_pubsub_incomming', {topic, msg, timestamp: Date.now()});
+	}
 
 	const __promise_ipfs_pubsub = (topic) => (resolve, reject) => 
 	{
