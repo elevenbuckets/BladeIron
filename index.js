@@ -1369,6 +1369,70 @@ server.register('ipfs_lspin', () =>
 	} 
 });
 
+// IPFS PUBSUB related
+server.event('ipfs_pubsub_incomming');
+const __ipfs_pubsub_handler = (msg) => { 
+	return server.emit('ipfs_pubsub_incomming', {topic, msg, timestamp: Date.now()});
+}
+
+server.register('ipfs_pubsub_subscribe', (args) => 
+{	
+	let topic = args[0];
+
+	const __promise_ipfs_pubsub = (topic) => (resolve, reject) => 
+	{
+		ipfsi.ipfsAPI.pubsub.subscribe(topic, __ipfs_pubsub_handler, {discover: true}, (err) => 
+		{ 
+			if (err) {
+				reject(err);
+			} else {
+				resolve(true);
+			}
+		})
+	}
+
+	return new Promise(__promise_ipfs_pubsub(topic));
+});
+
+server.register('ipfs_pubsub_unsubscribe', (args) => 
+{
+	let topic = args[0];
+
+	const __promise_ipfs_unpubsub = (topic) => (resolve, reject) => 
+	{
+		ipfsi.ipfsAPI.pubsub.unsubscribe(topic, __ipfs_pubsub_handler, (err) => 
+		{ 
+			if (err) {
+				reject(err);
+			} else {
+				resolve(true);
+			}
+		})
+	}
+
+	return new Promise(__promise_ipfs_unpubsub(topic));
+});
+
+server.register('ipfs_pubsub_publish', (args) => 
+{
+	let topic = args[0];
+	let data  = Buffer.from(args[1], 'utf8');
+
+	const __promise_ipfs_pubsub_data = (topic) => (data) => (resolve, reject) => 
+	{
+		ipfsi.ipfsAPI.pubsub.publish(topic, data, (err) => 
+		{ 
+			if (err) {
+				reject(err);
+			} else {
+				resolve(true);
+			}
+		})
+	}
+
+	return new Promise(__promise_ipfs_pubsub_data(topic)(data));
+});
+
 server.register('full_checks', () =>
 {
 	let geth = biapi.connected();
