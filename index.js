@@ -115,7 +115,7 @@ class BladeIron {
                 	}
 
 			this.GasOracle = this.configs.gasOracleAPI || undefined;
-                	this.TokenList = Tokens[this.networkID];
+                	this.TokenList = this.configs.Tokens[this.networkID] || Tokens[this.networkID];
 			this.userWallet = {};
                 	this.gasPrice = this.configs.defaultGasPrice || 50000000000;
 			this.qTimeout  = this.configs.queueInterval || 5000;
