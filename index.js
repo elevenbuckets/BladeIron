@@ -1216,10 +1216,19 @@ server.register('setGasPrice', (args) =>
 	}
 });
 
+server.register('gasPriceEst', () =>
+{
+	return biapi.gasPriceEst()	
+	.catch((err) => {
+		let defaultGasPrice = { low: '5000000000', mid: '9000000000', high: '15000000000', fast: '20000000000' };
+		return defaultGasPrice;
+	});
+});
+
 server.register('canUseAccount', (args) =>
 {
 	let address = args[0];
-                if (biapi.allAccounts().indexOf(address) === -1) return Promise.reject(server.error(503, 'Account not found'));
+                if (biapi.allAccounts().indexOf(address) === -1) return Promise.reject('Account not found');
 
                 try {
                         return biapi.managedAddress(address);
