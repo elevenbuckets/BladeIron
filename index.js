@@ -1205,6 +1205,11 @@ server.register('hotGroups', (tokenList) =>
 	}
 });
 
+server.register('hotGroupInfo', () => 
+{
+	return Promise.resolve(Object.keys(biapi.CUE.Token).map((t) => { return this.TokenList[t]; }));
+});
+
 server.register('setGasPrice', (args) => 
 {
 	let gasPrice = args[0];
