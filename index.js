@@ -1072,7 +1072,7 @@ server.register('sendTx', (args) => // sendTx(tokenSymbol, fromWallet, toAddress
 		jobObj = biapi.enqueueTx(tokenSymbol)(fromWallet, toAddress, amount, gasAmount);
 		return biapi.processJobs([jobObj]); // single job, thus single element in list
 	} catch (err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1115,7 +1115,7 @@ server.register('getTxObj', (args) => // getTxObj(tokenSymbol, fromWallet, toAdd
 	try {
 		return Promise.resolve(biapi.enqueueTx(tokenSymbol)(fromWallet, toAddress, amount, gasAmount));
 	} catch (err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1136,7 +1136,7 @@ server.register('newApp', (args) => // newApp(appSymbol, version, contract, abiP
 		}
 	} catch (err) {
 		console.log(err);
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}	
 });
 
@@ -1192,7 +1192,7 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
 	try {
 		return Promise.resolve(biapi.enqueueTk(type, contract, call, appArgs)(fromWallet, amount, gasAmount, tkObj));
 	} catch (err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1201,7 +1201,7 @@ server.register('hotGroups', (tokenList) =>
 	try {
 		return Promise.resolve(biapi.hotGroups(tokenList));
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1212,7 +1212,7 @@ server.register('setGasPrice', (args) =>
 		biapi.gasPrice = gasPrice;
 		return Promise.resolve(true);
 	} catch (err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1225,7 +1225,7 @@ server.register('canUseAccount', (args) =>
                         return biapi.managedAddress(address);
                 } catch(err) {
 		console.log(err);
-                        return Promise.reject(server.error(404, err));
+                        return Promise.reject(err);
                 }	
 });
 
@@ -1234,7 +1234,7 @@ server.register('processJobs', (jobList) =>
 	try {
 		return biapi.processJobs(jobList);
 	} catch (err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1244,7 +1244,7 @@ server.register('addrEtherBalance', (args) => // addrEtherBalance(address)
 	try {
 		return Promise.resolve(biapi.addrEtherBalance(address));
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1256,7 +1256,7 @@ server.register('addrTokenBalance', (args) => // addrTokenBalance(tokenSymbol, a
 	try {
 		return Promise.resolve(biapi.addrTokenBalance(tokenSymbol)(address));
 	} catch (err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1268,7 +1268,7 @@ server.register('getReceipts', (args) => // getRecepts(Q)
 		return biapi.getReceipt(txhashes);
 	} catch (err) {
 		console.log(err);
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1289,7 +1289,7 @@ server.register('ipfs_pullFile', (args) => // ipfs_pullFile(inhash, outpath)
 	try {
 		return ipfsi.pullFile(inhash, outpath);
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1299,7 +1299,7 @@ server.register('ipfs_put', (args) => // ipfs_put(fpath)
 	try {
 		return ipfsi.put(fpath);
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1309,7 +1309,7 @@ server.register('ipfs_read', (args) => // ipfs_read(hash)
 	try {
 		return ipfsi.read(hash);
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1319,7 +1319,7 @@ server.register('ipfs_readPath', (args) => // ipfs_readPath(ipfspath)
 	try {
 		return ipfsi.readPath(ipfspath);
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1334,7 +1334,7 @@ server.register('ipfs_publish', (args) => // ipfs_resolve(contentHash, key = nul
 			return ipfsi.publish(hash);
 		}
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1344,7 +1344,7 @@ server.register('ipfs_resolve', (args) => // ipfs_resolve(ipnsHash)
 	try {
 		return ipfsi.resolve(ipnsHash);
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	}
 });
 
@@ -1356,7 +1356,7 @@ server.register('ipfs_pullIPNS', (args) => // ipfs_pullIPNS(ipnsHash)
 	try {
 		return ipfsi.pullIPNS(ipnsHash);
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	} 
 });
 
@@ -1365,7 +1365,7 @@ server.register('ipfs_lspin', () =>
 	try {
 		return ipfsi.lspin();
 	} catch(err) {
-		return Promise.reject(server.error(404, err));
+		return Promise.reject(err);
 	} 
 });
 
