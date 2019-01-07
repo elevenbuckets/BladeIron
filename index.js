@@ -1250,14 +1250,29 @@ server.register('canUseAccount', (args) =>
                 }	
 });
 
+server.event('newJobs');
 server.register('processJobs', (jobList) =>
 {
 	try {
-		return biapi.processJobs(jobList);
+		return biapi.processJobs(jobList).then((Q) => 
+		{
+			server.emit('newJobs', {qid: Q});
+			return Q;
+		});
 	} catch (err) {
 		return Promise.reject(err);
 	}
 });
+
+server.register('syncRcdQ', args) => 
+{
+	let qid = args[0];
+	try {
+		return biapi.rcdQ[qid];	
+	} catch (err) {
+		return Promise.reject(err);
+	}
+}
 
 server.register('addrEtherBalance', (args) => // addrEtherBalance(address)
 {
