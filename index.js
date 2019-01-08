@@ -1264,7 +1264,7 @@ server.register('processJobs', (jobList) =>
 	}
 });
 
-server.register('syncRcdQ', args) => 
+server.register('syncRcdQ', (args) => 
 {
 	let qid = args[0];
 	try {
@@ -1272,7 +1272,7 @@ server.register('syncRcdQ', args) =>
 	} catch (err) {
 		return Promise.reject(err);
 	}
-}
+});
 
 server.register('addrEtherBalance', (args) => // addrEtherBalance(address)
 {
