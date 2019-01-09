@@ -163,6 +163,7 @@ class BladeIron {
 	                                if (
 	                                    this.web3 instanceof Web3
 	                                 && this.web3.net._requestManager.provider instanceof Web3.providers.HttpProvider
+					 && this.web3.net.listening
 	                                ) {
 	
 	                                        if (this.networkID === 'NO_CONNECTION') this.networkID = this.configs.networkID; // reconnected
@@ -184,7 +185,7 @@ class BladeIron {
 	                                        reject(false);
 	                                }
 	                        } catch (err) {
-	                                console.log(err);
+	                                //console.log(err);
 	                                reject(false);
 	                        }
 	                }
@@ -1009,7 +1010,6 @@ const server = new WSServ({
 
 server.on('listening', () => { process.send("Ready") });
 // Registering methods
-server.event('connected');
 server.event('ethstats');
 
 let currentBlock = 0;
@@ -1018,10 +1018,12 @@ const observer = (sec = 1001) =>
 {
 	const __block_progress = () => 
 	{
-		let stat = biapi.ethNetStatus(); 
-		if (stat.blockHeight !== 0 && stat.blockHeight > currentBlock) {
+		let stat = biapi.ethNetStatus(); stat['connected'] = true; 
+		if (stat.blockHeight !== 0 && (stat.blockHeight !== stat.highestBlock || stat.blockHeight > currentBlock)) {
 			server.emit('ethstats', stat);
 			currentBlock = stat.blockHeight;
+		} else if (stat.blockHeight === 0) {
+			server.emit('ethstats', stat);
 		}
 	}
 
@@ -1029,7 +1031,8 @@ const observer = (sec = 1001) =>
 	{ 
 		if (!biapi.connected() && biapi.configured()) {
 			return biapi.connect().then((rc) => {
-				if (rc) __block_progress();
+				if (rc) return __block_progress();
+				server.emit('ethstats', {connected: false});
 			})
 			.catch((err) => { console.log(`DEBUG: lost geth connections`); })
 		} else if (biapi.connected()) {
@@ -1044,14 +1047,10 @@ server.register('initialize', (obj) =>
 {
 	biapi.setup(obj); 
 	console.dir(obj);
-	biapi.connect().then((rc) => 
-	{
-		 if (rc) {
-		 	let sec = obj.observe_interval || 1001;
-	         	server.emit('connected', biapi.connected());
-		 	serverTimer = observer(sec);
-		 }
-        });
+ 	let sec = obj.observe_interval || 1001;
+ 	serverTimer = observer(sec);
+
+	return biapi.connected();
 });
 
 server.register('accounts', () => { return biapi.allAccounts() });
@@ -1322,13 +1321,12 @@ server.register('getReceipts', (args) => // getRecepts(Q)
 	}
 });
 
-server.event('ipfs_connected');
 server.register('ipfs_initialize', (obj) =>
 {
 	ipfsi.init(obj);
 	ipfsi.start().then(() => 
 	{ 
-		server.emit(ipfs_connected, typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready); 
+		return typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started; 
 	});		
 });
 
@@ -1487,7 +1485,7 @@ server.register('ipfs_pubsub_publish', (args) =>
 server.register('full_checks', () =>
 {
 	let geth = biapi.connected();
-	let ipfs = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready;
+	let ipfs = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started;
 
 	return Promise.resolve({geth, ipfs});
 });
@@ -1497,7 +1495,7 @@ server.register('fully_initialize', (obj) =>
 	let gethCfg = obj.geth;
 	let ipfsCfg = obj.ipfs;
 	let gethChk = biapi.connected();
-	let ipfsChk = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready;
+	let ipfsChk = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started;
 
 	console.log("DEBUG:");
 	console.log(obj);
@@ -1512,11 +1510,9 @@ server.register('fully_initialize', (obj) =>
 		gethChk ? true : biapi.connect().then((rc) =>
 	        {
 			try {
-				if (!rc) return rc;
-
 	                	let sec = obj.observe_interval || 1001;
-	                 	server.emit('connected', biapi.connected());
 	                 	serverTimer = observer(sec);
+				return rc;
 			} catch(err) {
 				console.log(err);
 				return false;
