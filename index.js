@@ -1031,7 +1031,7 @@ const observer = (sec = 1001) =>
 			return biapi.connect().then((rc) => 
 			{
 				if (rc) __block_progress();
-			});
+			}).catch(err) => { console.log(`DEBUG: lost geth connections`); })
 		} else if (biapi.connected()) {
 			__block_progress();
 		}
