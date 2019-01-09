@@ -1016,12 +1016,24 @@ let currentBlock = 0;
 
 const observer = (sec = 1001) => 
 {
-	return setInterval(() => 
-	{ 
+	const __block_progress = () => 
+	{
 		let stat = biapi.ethNetStatus(); 
 		if (stat.blockHeight !== 0 && stat.blockHeight > currentBlock) {
 			server.emit('ethstats', stat);
 			currentBlock = stat.blockHeight;
+		}
+	}
+
+	return setInterval(() => 
+	{ 
+		if (!biapi.connected() && biapi.configured()) {
+			return biapi.connect().then((rc) => 
+			{
+				if (rc) __block_progress();
+			});
+		} else if (biapi.connected()) {
+			__block_progress();
 		}
 	}, sec);
 }
@@ -1034,9 +1046,11 @@ server.register('initialize', (obj) =>
 	console.dir(obj);
 	biapi.connect().then((rc) => 
 	{
-		 let sec = obj.observe_interval || 1001;
-	         server.emit('connected', biapi.connected());
-		 serverTimer = observer(sec);
+		 if (rc) {
+		 	let sec = obj.observe_interval || 1001;
+	         	server.emit('connected', biapi.connected());
+		 	serverTimer = observer(sec);
+		 }
         });
 });
 
