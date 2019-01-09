@@ -1028,10 +1028,10 @@ const observer = (sec = 1001) =>
 	return setInterval(() => 
 	{ 
 		if (!biapi.connected() && biapi.configured()) {
-			return biapi.connect().then((rc) => 
-			{
+			return biapi.connect().then((rc) => {
 				if (rc) __block_progress();
-			}).catch(err) => { console.log(`DEBUG: lost geth connections`); })
+			})
+			.catch((err) => { console.log(`DEBUG: lost geth connections`); })
 		} else if (biapi.connected()) {
 			__block_progress();
 		}
