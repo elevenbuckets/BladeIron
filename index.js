@@ -1014,7 +1014,7 @@ server.event('ethstats');
 
 let currentBlock = 0;
 
-const observer = (sec = 1001) => 
+const observer = (sec = 3001) => 
 {
 	const __block_progress = () => 
 	{
