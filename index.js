@@ -1351,6 +1351,15 @@ server.register('ipfs_put', (args) => // ipfs_put(fpath)
 	}
 });
 
+server.register('ipfs_multiparts', (args) => 
+{
+	try {
+		return ipfsi.ipfsAPI.files.add(args); // args is an array of paths
+	} catch(err) {
+		return Promise.reject(err);
+	}
+});
+
 server.register('ipfs_read', (args) => // ipfs_read(hash)
 {
 	let hash = args[0];
