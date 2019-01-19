@@ -1287,25 +1287,58 @@ server.register('syncRcdQ', (args) =>
 	}
 });
 
-server.register('addrEtherBalance', (args) => // addrEtherBalance(address)
+server.register('addrEtherBalance', (args = null) => // addrEtherBalance(address)
 {
-	let address = args[0];
-	try {
-		return Promise.resolve(biapi.addrEtherBalance(address));
-	} catch(err) {
-		return Promise.reject(err);
+	if (args.length === 1) {
+		let address = args[0];
+		try {
+			return Promise.resolve(biapi.addrEtherBalance(address));
+		} catch(err) {
+			return Promise.reject(err);
+		}
+	} else if (args.length > 1) {
+		let addressList = args; // assuming to be all addresses
+		try {
+			return Promise.all(addressList.map((addr) => { return {[addr]: biapi.addrEtherBalance(addr)} }));
+		} catch(err) {
+			return Promise.reject(err);
+		}
+	} else {
+		let addressList = biapi.allAccounts();
+		try {
+			return Promise.all(addressList.map((addr) => { return {[addr]: biapi.addrEtherBalance(addr)} }));
+		} catch(err) {
+			return Promise.reject(err);
+		}
 	}
 });
 
 server.register('addrTokenBalance', (args) => // addrTokenBalance(tokenSymbol, address)
 {
-	let tokenSymbol = args[0];
-	let address     = args[1];
+	if ( args.filter( (i) => { return typeof(i) === 'object'} ).length === 0 ) {
+		let tokenSymbol = args[0];
+		let address     = args[1];
 
-	try {
-		return Promise.resolve(biapi.addrTokenBalance(tokenSymbol)(address));
-	} catch (err) {
-		return Promise.reject(err);
+		try {
+			return Promise.resolve(biapi.addrTokenBalance(tokenSymbol)(address));
+		} catch (err) {
+			return Promise.reject(err);
+		}
+	} else if ( args.filter( (i) => { return typeof(i) === 'object'} ).length === args.length ) {
+		return Promise.all(
+			args.map((chkObj) => 
+			{
+				try {
+					let address = Object.keys(chkObj)[0];
+					let tokenSymbol = chkObj[address];
+					return { [address]: { [tokenSymbol]: biapi.addrTokenBalance(tokenSymbol)(address) } };
+				} catch (err) {
+					console.trace(err);
+					return {};
+				}
+			}));
+	} else {
+		return Promise.reject(`Invalid argument format.`);
 	}
 });
 
