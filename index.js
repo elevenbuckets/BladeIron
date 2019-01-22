@@ -1209,13 +1209,71 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
 	}
 });
 
-server.register('hotGroups', (tokenList) =>
+/*
+ * Regardless it's for read-only or tx-only process, the biapi.CUE.Token *NEEDS* to have the union of token list in order for those calls
+ * to function. In other words, we always have been actially keeping a 'global union token list' passively inside biapi.CUE.Token.
+ *
+ * The information of this list can be synced through server-side method 'hotGroupInfo'. which gives information of tokens that are watched 
+ * either due to "read-only" or "tx-only" needs. The missing pieces, however, is the per-app ACL (allow sending or not) functionality. Yet if we 
+ * forget about ACL for the moment (as namespace integration is still WIP), and assuming there's *ONLY* a single global token watch list that
+ * every app will use, then the existing hotGroups design can already work to cover this need.
+ *
+ * Note that: "tx-only" tokens will still have to have their token information to be "readable", which lead us to the following:
+ * - Currently, without worrying too much about per-app ACL, we simply create a "global token watch list" that every app will use.
+ * - Every app will actually be able to read information of any watched tokens in that global list, due to the fact that BI server has to 
+ *   maintain a union list inside biapi.CUE.Token. Although practically speaking, each app will only care about a subset of this list 
+ *   of those token that it cares.
+ * - This "global token watch list" is actually identical to the *passive* global union token list, biapi.CUE.Token. The CP token page simply 
+ *   allows user to create an initialization of the list with pre-selected tokens during BI server initialization. The added API functions include:
+ *
+ *   High-level call 				|		Low-level call
+ *
+ *   addToken(symbol)(ctrAddr)(decimals)			addToken([symbol, ctrAddr, decimals])
+ *   removeToken(symbol)					removeToken([symbol])
+ *   watchTokens(tokenSymbolList)				watchTokens([symbol01, symbol02 ... symbolXX])	
+ *   unwatchTokens(tokenSymbolList)				unwatchTokens([symbol01, symbol02 ... symbolXX])
+ *   							(on CP initialization, from CP BI sub-class call) watchTokens(configs.tokens)
+ *
+ * - Finally, the tx limitation (ACL) of list of tokens allowed to be transfered by certain app will become its own object mapping between app name
+ *   and their specific granted token tx (symbol) list. This list right now is configurable at app initialization and should be able to be passed to 
+ *   server, yet it will onlt *really* be enforced by per namespace job queue related call segregations, which may require forking the upstream rpc-ws
+ *   server code base.
+ *
+ * -- 01/22/2019, Jason Lin
+*/
+server.event('synctokens');
+server.register('watchTokens', (tokenList) =>
 {
-	try {
-		return Promise.resolve(biapi.hotGroups(tokenList));
-	} catch(err) {
-		return Promise.reject(err);
-	}
+	return Promise.resolve(biapi.hotGroups(tokenList)).then((rc) => { server.emit('synctokens'); return rc; })
+		      .catch((err) => { console.trace(err); return false; });
+});
+
+server.register('unwatchTokens', (tokenList) => 
+{
+	let newTokenList = Object.keys(biapi.CUE.Token).filter( (t) => { return tokenList.findIndex(t) === -1 });
+
+	return Promise.resolve(biapi.hotGroups(newTokenList)).then((rc) => { server.emit('synctokens'); return rc; })
+		      .catch((err) => { console.trace(err); return false; });
+});
+
+server.register('addToken', (args) => 
+{
+	let tokenSymbol   = args[0];
+	let tokenAddr     = args[1];
+	let tokenDecimals = args[2];
+
+	// MORE code here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	return Promise.resolve(true)
+		      .catch((err) => { console.trace(err); return false });
+});
+
+server.register('removeToken', (args) => 
+{
+	let tokenSymbol   = args[0];
+
+	// MORE code here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	return Promise.resolve(true)
+		      .catch((err) => { console.trace(err); return false });
 });
 
 server.register('hotGroupInfo', () => 
