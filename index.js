@@ -1159,13 +1159,14 @@ server.register('call', (callObj) => // callObj example: {appName: 'appName', ct
 	let appName = callObj.appName;
 	let ctrName = callObj.ctrName;
 	let callName = callObj.callName;
+	let fromAddr = callObj.fromAddr;
 	try {
 		abiObj = biapi.CUE[appName].ABI[ctrName].filter((i) => { return (i.name === callName && i.constant === true) } );
 		
 		if (abiObj.length === 1 && abiObj[0].inputs.length === callObj.args.length) {
 			//console.log("Calling " + callName)
 			let __call = (resolve, reject) => {
-				biapi.CUE[appName][ctrName][callName](...callObj.args, (err, result) => {
+				biapi.CUE[appName][ctrName][callName](...callObj.args, {from: fromAddr}, (err, result) => {
 					if (err) return reject(err);
 					//console.log("HERE!")
 					resolve(result);
