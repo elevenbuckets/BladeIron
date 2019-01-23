@@ -1229,7 +1229,7 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
  *
  *   High-level call 				|		Low-level call
  *
- *   addToken(symbol)(ctrAddr)(decimals)			addToken([symbol, ctrAddr, decimals])
+ *   addToken(symbol, name)(ctrAddr)(decimals)			addToken([symbol, name, ctrAddr, decimals])
  *   removeToken(symbol)					removeToken([symbol])
  *   watchTokens(tokenSymbolList)				watchTokens([symbol01, symbol02 ... symbolXX])	
  *   unwatchTokens(tokenSymbolList)				unwatchTokens([symbol01, symbol02 ... symbolXX])
@@ -1240,7 +1240,9 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
  *   server, yet it will onlt *really* be enforced by per namespace job queue related call segregations, which may require forking the upstream rpc-ws
  *   server code base.
  *
- * -- 01/22/2019, Jason Lin
+ * As first ACL attempt, we will limit the token related calls (except hotGroupInfo) as well as master unlock function to CP namespace only.
+ *
+ * -- 01/23/2019, Jason Lin
 */
 server.event('synctokens');
 server.register('watchTokens', (tokenList) =>
