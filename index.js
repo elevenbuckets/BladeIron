@@ -1262,21 +1262,32 @@ server.register('unwatchTokens', (tokenList) =>
 server.register('addToken', (args) => 
 {
 	let tokenSymbol   = args[0];
-	let tokenAddr     = args[1];
-	let tokenDecimals = args[2];
+	let tokenName     = args[1];
+	let tokenAddr     = args[2];
+	let tokenDecimals = args[3];
 
-	// MORE code here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	return Promise.resolve(true)
-		      .catch((err) => { console.trace(err); return false });
+	try {
+		this.tokenList = {...this.tokenList, [tokenSymbol]: {addr: tokenAddr, name : tokenName, decimals: tokenDecimals}}
+		return Promise.resolve(true);
+	} catch (err) {
+		console.trace(err);
+		return Promise.reject(err);
+	}
+	
 });
 
 server.register('removeToken', (args) => 
 {
 	let tokenSymbol   = args[0];
 
-	// MORE code here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	return Promise.resolve(true)
-		      .catch((err) => { console.trace(err); return false });
+	try {
+		delete this.tokenList[tokenSymbol];
+		return Promise.resolve(true);
+	} catch (err) {
+		console.trace(err);
+		return Promise.reject(err);
+	}
+
 });
 
 server.register('hotGroupInfo', () => 
