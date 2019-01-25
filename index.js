@@ -1267,7 +1267,7 @@ server.register('addToken', (args) =>
 	let tokenDecimals = args[3];
 
 	try {
-		this.tokenList = {...this.tokenList, [tokenSymbol]: {addr: tokenAddr, name : tokenName, decimals: tokenDecimals}}
+		biapi.TokenList = {...biapi.TokenList, [tokenSymbol]: {addr: tokenAddr, name : tokenName, decimals: tokenDecimals}}
 		return Promise.resolve(true);
 	} catch (err) {
 		console.trace(err);
@@ -1281,7 +1281,7 @@ server.register('removeToken', (args) =>
 	let tokenSymbol   = args[0];
 
 	try {
-		delete this.tokenList[tokenSymbol];
+		delete biapi.TokenList[tokenSymbol];
 		return Promise.resolve(true);
 	} catch (err) {
 		console.trace(err);
