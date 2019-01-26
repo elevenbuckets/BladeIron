@@ -633,7 +633,9 @@ class BladeIron {
 	        {
 	                if (this.connected()) {
 	                        this.TokenABI  = this.web3.eth.contract(EIP20ABI);
-	                }
+			}
+			// reset this.CUE.Token first
+			this.CUE.Token={};
 	
 	                let rc = tokenList.map( (token) =>
 	                {
