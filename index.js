@@ -1251,6 +1251,7 @@ server.register('watchTokens', (tokenList) =>
 		      .catch((err) => { console.trace(err); return false; });
 });
 
+/*
 server.register('unwatchTokens', (tokenList) => 
 {
 	let newTokenList = Object.keys(biapi.CUE.Token).filter( (t) => { return tokenList.findIndex(t) === -1 });
@@ -1258,6 +1259,25 @@ server.register('unwatchTokens', (tokenList) =>
 	return Promise.resolve(biapi.hotGroups(newTokenList)).then((rc) => { server.emit('synctokens'); return rc; })
 		      .catch((err) => { console.trace(err); return false; });
 });
+*/
+
+server.register('unwatchTokens', (tokenList) => 
+{
+	if (!biapi.validPass()) return Promise.reject(false);
+
+	let addr = '0x11bec9';
+	let qWarning = setTimeout(() => { server.emit('delayApply', {'unwatchTokens': tokenList}); }, 4000); // 4 second timeout should be configuable
+
+	return biapi.prepareQ().then((Q) => {
+		if (typeof(biapi.ControlPanel_removeTokens_internal) === 'undefined') throw 'missing internal CP conditions';
+		return biapi.ControlPanel_removeTokens_internal(addr, {args: tokenList});
+	}).then((rc) => {
+		clearTimeout(qWarning);
+		server.emit('synctokens');
+		return true;
+	})
+	.catch((err) => { console.trace(err); return false; });
+})
 
 server.register('addToken', (args) => 
 {
