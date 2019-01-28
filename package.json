@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "11BE: BladeIron RPC-WS Service",
   "main": "index.js",
+  "babel": {
+    "plugins": [
+      "transform-class-properties",
+      "transform-object-rest-spread"
+    ]
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
