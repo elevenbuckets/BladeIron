@@ -1270,10 +1270,12 @@ server.register('unwatchTokens', (tokenList) =>
 
 	return biapi.prepareQ().then((Q) => {
 		if (typeof(biapi.ControlPanel_removeTokens_internal) === 'undefined') throw 'missing internal CP conditions';
-		return biapi.ControlPanel_removeTokens_internal(addr, {args: tokenList});
-	}).then((rc) => {
+		biapi.ControlPanel_removeTokens_internal(addr, {args: tokenList});
+		return Q;
+	}).then((Q) => {
 		clearTimeout(qWarning);
 		server.emit('synctokens');
+		delete biapi.jobQ[Q];
 		return true;
 	})
 	.catch((err) => { console.trace(err); return false; });
