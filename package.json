@@ -22,7 +22,7 @@
     "asar": "^0.14.3",
     "async": "^2.6.1",
     "bignumber.js": "^5.0.0",
-    "buttercup": "^2.10.0",
+    "buttercup": "^1.6.2",
     "ethereumjs-utils": "^5.2.5",
     "ipfs_base": "git+ssh://git@github.com/elevenbuckets/ipfs_go.git",
     "keythereum": "git+ssh://git@github.com/elevenbuckets/keythereum.git",
