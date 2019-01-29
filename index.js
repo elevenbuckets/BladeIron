@@ -18,7 +18,8 @@ const ethUtils = require('ethereumjs-utils');
 
 // account manager
 const bcup  = require('buttercup');
-const { createCredentials, FileDatasource } = bcup;
+const { createCredentials, Datasources } = bcup;
+const { FileDatasource } = Datasources;
 const masterpw = new WeakMap();
 
 // condition checks
