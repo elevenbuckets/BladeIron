@@ -1269,8 +1269,8 @@ server.register('unwatchTokens', (tokenList) =>
 	let qWarning = setTimeout(() => { server.emit('delayApply', {'unwatchTokens': tokenList}); }, 4000); // 4 second timeout should be configuable
 
 	return biapi.prepareQ().then((Q) => {
-		if (typeof(biapi.ControlPanel_removeTokens_internal) === 'undefined') throw 'missing internal CP conditions';
-		biapi.ControlPanel_removeTokens_internal(addr, {args: tokenList});
+		if (typeof(biapi['ControlPanel_removeTokens_internal']) === 'undefined') throw 'missing internal CP conditions';
+		biapi['ControlPanel_removeTokens_internal'](addr, {args: tokenList});
 		return Q;
 	}).then((Q) => {
 		clearTimeout(qWarning);
