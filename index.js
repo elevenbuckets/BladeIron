@@ -1590,17 +1590,26 @@ server.register('fully_initialize', (obj) =>
 // --- Jason Lin, 01/30/2019
 let lastKnownCPId = '';
 server._generateNamespace("/controlPanel");
+server._generateNamespace("/_"); // null namespace 
 server.register('newApp', (args) => // newApp(appSymbol, version, contract, abiPath, conditions, address = null)
 {
 	if ([ ...server.namespaces['/controlPanel'].clients.keys() ].length > 1) {
 		let bad = [ ...server.namespaces['/controlPanel'].clients.keys() ].filter((x) => { return x !== lastKnownCPId; });
-		return Promise.resolve()
-			 .then(() => {
-				throw 'Another control panel has already connected';
-			 }).catch((err) => { 
-				bad.map((b) => {server.namespaces['/controlPanel'].clients.get(b).close() });
-				console.dir([ ...server.namespaces['/controlPanel'].clients.keys() ]);
-			 })
+		return Promise.reject()
+			.catch(() => {
+				bad.map((b) => { 
+					let s = server.namespaces['/controlPanel'].clients.get(b); 
+					server.namespaces['/controlPanel'].clients.delete(b);
+					Object.keys(server.namespaces['/controlPanel'].events).map((e) =>
+ 			                {
+                    				let index = server.namespaces['/controlPanel'].events[e].indexOf(b)
+                   				if (index >= 0) server.namespaces['/controlPanel'].events[e].splice(index, 1)
+					})	
+					s.readyState = 1; 
+					s._socket.end(); 
+					s._socket.unref();
+			        });
+		       })
 	} else if ([ ...server.namespaces['/controlPanel'].clients.keys() ].length === 1) {
 		lastKnownCPId = [ ...server.namespaces['/controlPanel'].clients.keys() ][0];
 	}
