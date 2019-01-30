@@ -1009,6 +1009,7 @@ const server = new WSServ({
 });
 
 server.on('listening', () => { process.send("Ready") });
+
 // Registering methods
 server.event('ethstats');
 
@@ -1043,6 +1044,7 @@ const observer = (sec = 3001) =>
 
 let serverTimer;
 
+/*
 server.register('initialize', (obj) => 
 {
 	biapi.setup(obj); 
@@ -1052,6 +1054,7 @@ server.register('initialize', (obj) =>
 
 	return biapi.connected();
 });
+*/
 
 server.register('accounts', () => { return biapi.allAccounts() });
 server.register('ethNetStatus', () => { return biapi.ethNetStatus() });
@@ -1245,72 +1248,6 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
  * -- 01/23/2019, Jason Lin
 */
 server.event('synctokens');
-server.register('watchTokens', (tokenList) =>
-{
-	return Promise.resolve(biapi.hotGroups(tokenList)).then((rc) => { server.emit('synctokens'); return rc; })
-		      .catch((err) => { console.trace(err); return false; });
-});
-
-/*
-server.register('unwatchTokens', (tokenList) => 
-{
-	let newTokenList = Object.keys(biapi.CUE.Token).filter( (t) => { return tokenList.findIndex(t) === -1 });
-
-	return Promise.resolve(biapi.hotGroups(newTokenList)).then((rc) => { server.emit('synctokens'); return rc; })
-		      .catch((err) => { console.trace(err); return false; });
-});
-*/
-
-server.register('unwatchTokens', (tokenList) => 
-{
-	if (!biapi.validPass()) return Promise.reject(false);
-
-	let addr = '0x11bec9';
-	let qWarning = setTimeout(() => { server.emit('delayApply', {'unwatchTokens': tokenList}); }, 4000); // 4 second timeout should be configuable
-
-	return biapi.prepareQ().then((Q) => {
-		if (typeof(biapi['ControlPanel_removeTokens_internal']) === 'undefined') throw 'missing internal CP conditions';
-		biapi['ControlPanel_removeTokens_internal'](addr, {args: tokenList});
-		return Q;
-	}).then((Q) => {
-		clearTimeout(qWarning);
-		server.emit('synctokens');
-		delete biapi.jobQ[Q];
-		return true;
-	})
-	.catch((err) => { console.trace(err); return false; });
-})
-
-server.register('addToken', (args) => 
-{
-	let tokenSymbol   = args[0];
-	let tokenName     = args[1];
-	let tokenAddr     = args[2];
-	let tokenDecimals = args[3];
-
-	try {
-		biapi.TokenList = {...biapi.TokenList, [tokenSymbol]: {addr: tokenAddr, name : tokenName, decimals: tokenDecimals}}
-		return Promise.resolve(true);
-	} catch (err) {
-		console.trace(err);
-		return Promise.reject(err);
-	}
-	
-});
-
-server.register('removeToken', (args) => 
-{
-	let tokenSymbol   = args[0];
-
-	try {
-		delete biapi.TokenList[tokenSymbol];
-		return Promise.resolve(true);
-	} catch (err) {
-		console.trace(err);
-		return Promise.reject(err);
-	}
-
-});
 
 server.register('hotGroupInfo', () => 
 {
@@ -1366,16 +1303,6 @@ server.register('processJobs', (jobList) =>
 			server.emit('newJobs', {qid: Q});
 			return Q;
 		});
-	} catch (err) {
-		return Promise.reject(err);
-	}
-});
-
-server.register('syncRcdQ', (args) => 
-{
-	let qid = args[0];
-	try {
-		return biapi.rcdQ[qid];	
 	} catch (err) {
 		return Promise.reject(err);
 	}
@@ -1448,6 +1375,7 @@ server.register('getReceipts', (args) => // getRecepts(Q)
 	}
 });
 
+/*
 server.register('ipfs_initialize', (obj) =>
 {
 	ipfsi.init(obj);
@@ -1456,6 +1384,7 @@ server.register('ipfs_initialize', (obj) =>
 		return typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started; 
 	});		
 });
+*/
 
 server.register('ipfs_pullFile', (args) => // ipfs_pullFile(inhash, outpath)
 {
@@ -1650,6 +1579,121 @@ server.register('fully_initialize', (obj) =>
 
 	return Promise.all(reqs);
 });
+
+// ControlPanel Default Namespace
+//
+// Note that here we first create the namespace; load namespace specific methods, and at the end merge
+// default ("/") namespace method by *prepending* them in order to keep things write.
+// similar things also needs to be done with events, but since most events in BI are global, we just always
+// reinstall events from default ("/") namespace...
+//
+// --- Jason Lin, 01/30/2019
+let lastKnownCPId = '';
+server._generateNamespace("/controlPanel");
+server.register('newApp', (args) => // newApp(appSymbol, version, contract, abiPath, conditions, address = null)
+{
+	if ([ ...server.namespaces['/controlPanel'].clients.keys() ].length > 1) {
+		let bad = [ ...server.namespaces['/controlPanel'].clients.keys() ].filter((x) => { return x !== lastKnownCPId; });
+		return Promise.resolve()
+			 .then(() => {
+				throw 'Another control panel has already connected';
+			 }).catch((err) => { 
+				bad.map((b) => {server.namespaces['/controlPanel'].clients.get(b).close() });
+				console.dir([ ...server.namespaces['/controlPanel'].clients.keys() ]);
+			 })
+	} else if ([ ...server.namespaces['/controlPanel'].clients.keys() ].length === 1) {
+		lastKnownCPId = [ ...server.namespaces['/controlPanel'].clients.keys() ][0];
+	}
+
+	let appSymbol = args[0];
+	let version   = args[1];
+	let contract  = args[2];
+	let abiPath   = args[3];
+	let conditions = args[4];
+
+	try {
+		if (args.length === 6 && args[5] != null) {
+			let address = args[5];
+			return Promise.resolve(biapi.newApp(appSymbol)(version, contract, abiPath, conditions, address));
+		} else {
+			return Promise.resolve(biapi.newApp(appSymbol)(version, contract, abiPath, conditions));
+		}
+	} catch (err) {
+		console.log(err);
+		return Promise.reject(err);
+	}	
+}, '/controlPanel');
+
+server.register('syncRcdQ', (args) => 
+{
+	let qid = args[0];
+	try {
+		return biapi.rcdQ[qid];	
+	} catch (err) {
+		return Promise.reject(err);
+	}
+}, '/controlPanel');
+
+server.register('watchTokens', (tokenList) =>
+{
+	return Promise.resolve(biapi.hotGroups(tokenList)).then((rc) => { server.emit('synctokens'); return rc; })
+		      .catch((err) => { console.trace(err); return false; });
+}, '/controlPanel');
+
+server.register('unwatchTokens', (tokenList) => 
+{
+	if (!biapi.validPass()) return Promise.reject(false);
+
+	let addr = '0x11bec9';
+	let qWarning = setTimeout(() => { server.emit('delayApply', {'unwatchTokens': tokenList}); }, 4000); // 4 second timeout should be configuable
+
+	return biapi.prepareQ().then((Q) => {
+		if (typeof(biapi['ControlPanel_removeTokens_internal']) === 'undefined') throw 'missing internal CP conditions';
+		biapi['ControlPanel_removeTokens_internal'](addr, {args: tokenList});
+		return Q;
+	}).then((Q) => {
+		clearTimeout(qWarning);
+		server.emit('synctokens');
+		delete biapi.jobQ[Q];
+		return true;
+	})
+	.catch((err) => { console.trace(err); return false; });
+}, '/controlPanel')
+
+server.register('addToken', (args) => 
+{
+	let tokenSymbol   = args[0];
+	let tokenName     = args[1];
+	let tokenAddr     = args[2];
+	let tokenDecimals = args[3];
+
+	try {
+		biapi.TokenList = {...biapi.TokenList, [tokenSymbol]: {addr: tokenAddr, name : tokenName, decimals: tokenDecimals}}
+		return Promise.resolve(true);
+	} catch (err) {
+		console.trace(err);
+		return Promise.reject(err);
+	}
+	
+}, '/controlPanel');
+
+server.register('removeToken', (args) => 
+{
+	let tokenSymbol   = args[0];
+
+	try {
+		delete biapi.TokenList[tokenSymbol];
+		return Promise.resolve(true);
+	} catch (err) {
+		console.trace(err);
+		return Promise.reject(err);
+	}
+
+}, '/controlPanel');
+
+let defaultMethods = {...server.namespaces["/"].rpc_methods }; delete defaultMethods['newApp'];
+server.namespaces["/controlPanel"].rpc_methods = {...defaultMethods, ...server.namespaces["/controlPanel"].rpc_methods};
+server.namespaces["/controlPanel"].events = {...server.namespaces["/"].events};
 
 process.on('SIGINT', () => {
    console.log("\tRPC Server stopping ...");
