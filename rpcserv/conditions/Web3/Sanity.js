@@ -6,7 +6,7 @@ module.exports =
 
 		if (
 			jobObj.txObj.to != this.web3.toAddress('0x0')
-		     && this.web3.toBigNumber(jobObj.txObj.value).gt(0)
+		     && this.web3.toBigNumber(jobObj.txObj.value).gte(0)
 		     && this.web3.eth.getBalance(addr).gte(gasCost)
 		) {
 			return true;
