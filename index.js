@@ -1129,9 +1129,18 @@ server.register('getTxObj', (args) => // getTxObj(tokenSymbol, fromWallet, toAdd
 	let gasAmount = 5;
 
                 if (tokenSymbol === 'ETH') {
-                        gasAmount = 21000;
+			if (this.web3.getCode(toAddress).length === 2) {
+                        	gasAmount = 21000;
+			} else if (this.web3.getCode(toAddress).length > 2) { // calling fallback ?!
+				try {
+					gasAmount = this.web3.eth.estimateGas({from: fromWallet, to: toAddress, value: amount});
+				} catch (err) {
+					console.trace(err);
+					return Promise.reject(err);
+				}
+			}
                 } else {
-		let callArgs = [toAddress, amount]
+			let callArgs = [toAddress, amount]
                         gasAmount = biapi.CUE['Token'][tokenSymbol]['transfer'].estimateGas(...callArgs, {from: fromWallet, gasPrice: biapi.gasPrice})
                 }
 
