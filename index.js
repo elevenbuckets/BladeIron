@@ -78,6 +78,8 @@ class BladeIron {
 
 		this.web3 = new Web3();
 		this.web3.toAddress = address => {
+			if (this.web3.isAddress(address)) return address.toLowerCase();
+
                         let addr = String(this.web3.toHex(this.web3.toBigNumber(address)));
 
                         if (addr.length === 42) {
@@ -730,10 +732,14 @@ class BladeIron {
 			// txObj field checks.
 			// While CastIron has conditions to perform final checks before send, basic checks here will allow 
 			// caller to drop invalid txObj even before entering promise chain.
+
+			// Sanitize
+			fromWallet = this.web3.toAddress(fromWallet);
+			toAddress  = this.web3.toAddress(toAddress);
+
 			if (
-				this.web3.toAddress(fromWallet) !== fromWallet
-			     || this.web3.toAddress(toAddress) !== toAddress
-			     || Number(amount) <= 0
+			     ( tokenSymbol !== 'ETH' && Number(amount) <= 0 )
+			     || ( tokenSymbol === 'ETH' && Number(amount) < 0 ) // allow 0 amount for nonpayable contract fallback
 			     || isNaN(Number(amount))
 			     || Number(gasAmount) <= 0
 			     || isNaN(Number(gasAmount))
@@ -779,9 +785,12 @@ class BladeIron {
 	                // caller to drop invalid txObj even before entering promise chain.
 	                //
 	                // Note: for enqueueTk, it is the caller's duty to verify elements in tkObj.
+
+			// Sanitize
+	                fromWallet = this.web3.toAddress(fromWallet);
+
 	                if (
-	                        this.web3.toAddress(fromWallet) !== fromWallet
-	                     || Number(gasAmount) <= 0
+	                     Number(gasAmount) <= 0
 	                     || isNaN(Number(gasAmount))
 	                ){
 	                        throw "enqueueTk: Invalid element in txObj";
