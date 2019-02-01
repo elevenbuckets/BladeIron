@@ -1129,11 +1129,11 @@ server.register('getTxObj', (args) => // getTxObj(tokenSymbol, fromWallet, toAdd
 	let gasAmount = 5;
 
                 if (tokenSymbol === 'ETH') {
-			if (this.web3.eth.getCode(toAddress).length === 2) {
+			if (biapi.web3.eth.getCode(toAddress).length === 2) {
                         	gasAmount = 21000;
-			} else if (this.web3.eth.getCode(toAddress).length > 2) { // calling fallback ?!
+			} else if (biapi.web3.eth.getCode(toAddress).length > 2) { // calling fallback ?!
 				try {
-					gasAmount = this.web3.eth.estimateGas({from: fromWallet, to: toAddress, value: amount});
+					gasAmount = biapi.web3.eth.estimateGas({from: fromWallet, to: toAddress, value: amount});
 				} catch (err) {
 					console.trace(err);
 					return Promise.reject(err);
