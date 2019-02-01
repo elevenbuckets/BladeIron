@@ -1129,9 +1129,9 @@ server.register('getTxObj', (args) => // getTxObj(tokenSymbol, fromWallet, toAdd
 	let gasAmount = 5;
 
                 if (tokenSymbol === 'ETH') {
-			if (this.web3.getCode(toAddress).length === 2) {
+			if (this.web3.eth.getCode(toAddress).length === 2) {
                         	gasAmount = 21000;
-			} else if (this.web3.getCode(toAddress).length > 2) { // calling fallback ?!
+			} else if (this.web3.eth.getCode(toAddress).length > 2) { // calling fallback ?!
 				try {
 					gasAmount = this.web3.eth.estimateGas({from: fromWallet, to: toAddress, value: amount});
 				} catch (err) {
