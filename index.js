@@ -1720,7 +1720,10 @@ server.register('removeToken', (args) =>
 
 let defaultMethods = {...server.namespaces["/"].rpc_methods }; delete defaultMethods['newApp'];
 server.namespaces["/controlPanel"].rpc_methods = {...defaultMethods, ...server.namespaces["/controlPanel"].rpc_methods};
-server.namespaces["/controlPanel"].events = {...server.namespaces["/"].events};
+//server.namespaces["/controlPanel"].events = {...server.namespaces["/"].events};
+server.event('ethstats', '/controlPanel');
+server.event('newJobs', '/controlPanel');
+server.event('synctokens', '/controlPanel');
 
 process.on('SIGINT', () => {
    console.log("\tRPC Server stopping ...");
