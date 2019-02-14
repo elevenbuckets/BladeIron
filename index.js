@@ -453,14 +453,36 @@ class BladeIron {
 	                        this.jobQ[Q][addr] = [];
 	                }
 	
-	                //conditional function call
-	                let cfname = `${jobObj.type}_${jobObj.call}_${this.condition}`;
-	
-	                if (typeof(this[cfname]) === 'undefined') {
-	                        throw new Error(`Invalid jobObj: ${JSON.stringify(jobObj, 0, 2)}`);
-	                } else if (typeof(this.CUE[jobObj.type]) === 'undefined' || typeof(this.CUE[jobObj.type][jobObj.contract]) === 'undefined') {
+	                if (typeof(this.CUE[jobObj.type]) === 'undefined' || typeof(this.CUE[jobObj.type][jobObj.contract]) === 'undefined') {
 	                        throw new Error(`Invalid or unknown contract ABI: ${JSON.stringify(jobObj, 0, 2)}`);
-	                } else if (this[cfname](addr, jobObj) == true) {
+	                }
+ 
+	                //conditional function call
+	                let cfname;
+			if (jobObj.type === 'Token' || jobObj.type === 'Web3') {
+			// internal type were designed with reusable group condition in mind, 
+			// at the moment apps initialized by newApps would have to have specific 
+			// condition per contract, even if they can be under same group due to 
+			// similarity. This should be fixed by introducing "group conditions" options
+			// when creating conditions for apps.
+			//
+			// e.g.: if the app condition module has attribute group = true, when the app is set
+			// to use the condition, assume all contracts in the app to follow same single 
+			// condition set identified by the "three-level" condition names.
+			// 
+			// -- Jason Lin, 2019/02/14
+	                	cfname = `${jobObj.type}_${jobObj.call}_${this.condition}`; // "three-level" condition name, group conditions
+			} else if ( jobObj.contract in this.CUE[jobObj.type] 
+			         && typeof(this[`${jobObj.type}_${jobObj.contract}_${jobObj.call}_${this.condition}`]) !== 'undefined'
+			) {
+				cfname = `${jobObj.type}_${jobObj.contract}_${jobObj.call}_${this.condition}`; // "four-level" condition name
+			}
+
+			if (typeof(this[cfname]) === 'undefined') {
+	                       	throw new Error(`Invalid condition of jobObj: ${JSON.stringify(jobObj, 0, 2)}`);
+			}
+
+	                if (this[cfname](addr, jobObj) == true) {
 	                        let args = job.args.map((e) =>
 	                        {
 	                                if (typeof(job[e]) === 'undefined') {
@@ -857,7 +879,7 @@ class BladeIron {
 	                });
 	
 	                // loading conditions. there names needs to follow CastIron conventions to be recognized by queue, otherwise job will fail.
-	                Object.keys(allConditions).map((f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] });
+	                Object.keys(allConditions).map((f) => { if(typeof(this[`${appSymbol}_${f}`]) === 'undefined') this[`${appSymbol}_${f}`] = allConditions[f] });
 
 			return { [appSymbol]: version, 'Ready': true };
 	        }
@@ -1675,8 +1697,8 @@ server.register('unwatchTokens', (tokenList) =>
 	let qWarning = setTimeout(() => { server.emit('delayApply', {'unwatchTokens': tokenList}); }, 4000); // 4 second timeout should be configuable
 
 	return biapi.prepareQ().then((Q) => {
-		if (typeof(biapi['ControlPanel_removeTokens_internal']) === 'undefined') throw 'missing internal CP conditions';
-		biapi['ControlPanel_removeTokens_internal'](addr, {args: tokenList});
+		if (typeof(biapi['ControlPanel_ControlPanel_removeTokens_internal']) === 'undefined') throw 'missing internal CP conditions';
+		biapi['ControlPanel_ControlPanel_removeTokens_internal'](addr, {args: tokenList});
 		return Q;
 	}).then((Q) => {
 		clearTimeout(qWarning);
