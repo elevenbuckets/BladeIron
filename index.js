@@ -1535,7 +1535,7 @@ server.register('ipfs_pubsub_subscribe', (args) =>
 			if (err) {
 				reject(err);
 			} else {
-				pubsub_topic[topic] = true;
+				pubsub_topics[topic] = true;
 				resolve(true);
 			}
 		})
@@ -1555,7 +1555,7 @@ server.register('ipfs_pubsub_unsubscribe', (args) =>
 			if (err) {
 				reject(err);
 			} else {
-				delete pubsub_topic[topic];
+				delete pubsub_topics[topic];
 				resolve(true);
 			}
 		})
