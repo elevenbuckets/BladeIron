@@ -1516,10 +1516,14 @@ server.register('ipfs_lspin', () =>
 // IPFS PUBSUB related
 server.event('ipfs_pubsub_incomming');
 let __ipfs_pubsub_handler;
+let pubsub_topics = {};
 
 server.register('ipfs_pubsub_subscribe', (args) => 
 {	
 	let topic = args[0];
+
+	if (topic in pubsub_topics) return true;
+
 	__ipfs_pubsub_handler = (msg) => { 
 		return server.emit('ipfs_pubsub_incomming', {topic, msg, timestamp: Date.now()});
 	}
@@ -1531,6 +1535,7 @@ server.register('ipfs_pubsub_subscribe', (args) =>
 			if (err) {
 				reject(err);
 			} else {
+				pubsub_topic[topic] = true;
 				resolve(true);
 			}
 		})
@@ -1550,6 +1555,7 @@ server.register('ipfs_pubsub_unsubscribe', (args) =>
 			if (err) {
 				reject(err);
 			} else {
+				delete pubsub_topic[topic];
 				resolve(true);
 			}
 		})
