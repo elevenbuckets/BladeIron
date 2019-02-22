@@ -1626,6 +1626,12 @@ server.register('fully_initialize', (obj) =>
 	return Promise.all(reqs);
 });
 
+server.register('getBlock', (args) => 
+{
+	let blockNo = args[0] || 'latest';
+	return biapi.web3.eth.getBlock(blockNo);
+});
+
 // ControlPanel Default Namespace
 //
 // Note that here we first create the namespace; load namespace specific methods, and at the end merge
