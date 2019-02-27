@@ -1239,7 +1239,7 @@ server.register('call', (callObj) => // callObj example: {appName: 'appName', ct
 	}
 });
 
-server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs, fromWallet, amount, tkObj)
+server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs, fromWallet, amount, tkObj, gasAmount)
 {
 	let type = args[0];
 	let contract = args[1];
@@ -1249,12 +1249,20 @@ server.register('getTkObj', (args) => // getTkObj(type, contract, call, appArgs,
 	let amount = args[5];
 	let tkObj = args[6];
 	let callArgs = appArgs.map((i) => { return tkObj[i] });
-	let gasAmount = 5;
+	let gasAmount;
 
-	if (amount === null) {
-		gasAmount = biapi.CUE[type][contract][call].estimateGas(...callArgs, {from: fromWallet, gasPrice: biapi.gasPrice})
-	} else {
-		gasAmount = biapi.CUE[type][contract][call].estimateGas(...callArgs, {from: fromWallet, value: amount, gasPrice: biapi.gasPrice})
+	try {
+		if (amount === null) {
+			gasAmount = biapi.CUE[type][contract][call].estimateGas(...callArgs, {from: fromWallet, gasPrice: biapi.gasPrice})
+		} else {
+			gasAmount = biapi.CUE[type][contract][call].estimateGas(...callArgs, {from: fromWallet, value: amount, gasPrice: biapi.gasPrice})
+		}
+	} catch(err) {
+		if(args.length === 8 && args[7] !== null) {
+			gasAmount = args[7];
+		} else {
+			return Promise.reject(`failed to determine gas amount, please specify it with manualGasJobs()`);
+		}
 	}
 
 	console.log(`DEBUG: calling ${call} using gasAmount = ${gasAmount}`)
