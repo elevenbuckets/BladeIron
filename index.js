@@ -522,10 +522,12 @@ class BladeIron {
 			let pw = masterpw.get(this).passwd;
 	
 			if (Q == undefined) {
-				throw "processQ: Invalid QID!!!";
+				console.log("processQ: Invalid QID!!!");
+				return Promise.reject(false);
 			} else if (typeof(this.jobQ[Q]) === 'undefined' || this.jobQ[Q].length === 0|| pw === null) {
 				delete this.jobQ[Q];
-				throw "Queue error (processQ), skipping...";
+				console.log("Queue error (processQ), skipping...");
+				return Promise.reject(false);
 			}
 	
 			return this.ds.load(createCredentials.fromPassword(pw)).then( (myArchive) => {
@@ -545,7 +547,7 @@ class BladeIron {
 						delete this.jobQ[Q][addr];
 						console.warn("no password provided for address " + addr + ", skipped ...");
 		
-		                        	return;
+		                        	return Promise.reject(false);
 		                	}
 		
 			                results = results.then( () => {
@@ -572,36 +574,35 @@ class BladeIron {
 										});
 								  	}
 								} catch(error) {
+									console.trace(error);
 									this.rcdQ[Q].push({id, addr, error,
-										'tx': null,
+										'tx': '0x0000000000000000000000000000000000000000000000000000000000000000',
 									        'type': o.type, 
 									        'contract': o.contract, 
 									        'call': o.call, ...o.txObj, 
 									        'amount': typeof(o['amount']) !== 'undefined' ? o.amount : null
 									});
-									throw(error);
 								}
 		                                	})
 			                        }).then( () => {
 		        	                        this.ipc3.personal.lockAccount(addr, (error, r) => {
 		                        	                if (error) {
+									console.trace(error);
 									this.rcdQ[Q].push({
-									  	'id': null, addr, 
-									  	'tx': null, error, 
+									  	'id': null, addr, error,
+									  	'tx': '0x0000000000000000000000000000000000000000000000000000000000000000', 
 									  	'type': 'ipc3', 
 									  	'contract': 'personal', 
 									  	'call': 'lockAccount',
 									  	'amount': null
 								  	});
-									throw(error);
 								}
 		
 		                	                        console.debug(`** account: ${addr} is now locked`);
 								delete this.jobQ[Q][addr];
 			                                });
 		        	                })
-		
-		                	}).catch( (error) => { console.error(error); delete this.jobQ[Q][addr]; return Promise.resolve(); } );
+		                	}).catch( (error) => { console.trace(error); delete this.jobQ[Q][addr]; return Promise.resolve(); } );
 		        	}); 
 			
 				results = results.then(() => { return this.closeQ(Q) });
@@ -613,7 +614,10 @@ class BladeIron {
 
 		this.closeQ = Q => 
 		{
-			if (Q == undefined || typeof(this.jobQ[Q]) === 'undefined') throw "Queue error (closeQ)";
+			if (Q == undefined || typeof(this.jobQ[Q]) === 'undefined') {
+				console.log("Queue error (closeQ)");
+				return Promise.reject(false);
+			}
 	
 			const __closeQ = (resolve, reject) => {
 				if (Object.keys(this.jobQ[Q]).length == 0) {
@@ -697,56 +701,62 @@ class BladeIron {
 				.then( (Q) => 
 				{
 					console.debug(`Queue ID: ${Q}, Enqueuing ...`);
-	
-					jobObjList.map( (job) => 
-					{
-						this.setAccount(job.type)(job.txObj.from);
-						let jobWallet = this.userWallet[job.type];
-						let userBalance = this.web3.eth.getBalance(jobWallet);
-	
-						console.debug(` - Account: ${jobWallet}; Balance: ${userBalance} ETH`);
-	
-						let gasCost = new BigNumber(job.txObj.gas).times(this.gasPrice); 
-	
-						if (
-						        typeof(this.TokenList[job.contract]) === 'undefined'
-						     && typeof(job.type) !== 'undefined' 
-						     && job.type === 'Token'
-						     && userBalance.sub(this.allocated[jobWallet]).gte(gasCost)
-						) {
-							console.debug(`WARN: Unknown token ${job.contract}, skipping job ...`);
-							return;
-						} else if (
-					     	        typeof(this.CUE[job.type]) === 'undefined'
-					     	     || typeof(this.CUE[job.type][job.contract]) === 'undefined'
-						) {
-							console.warn(`WARN: Invalid call ${job.type}.${job.contract}.${job.call}, skipping job ...`);
-							return;
-						} else if (
-							job.type !== 'Web3' 
-						     && userBalance.sub(this.allocated[jobWallet]).gte(gasCost) 
-						) {
-							console.debug(`INFO: calling ${job.type}.${job.contract}.${job.call}, allocating gas fee from wallet: ${gasCost}`);
-							this.allocated[jobWallet] = this.allocated[jobWallet].add(gasCost);
-						} else if (
-							job.type === 'Web3' 
-						     && userBalance.sub(this.allocated[jobWallet]).sub(job.txObj.value).gte(gasCost) 
-						) {
-							console.debug(`INFO: sending Ether, allocating gas fee ${gasCost} and ether ${job.txObj.value} from wallet`);
-							this.allocated[jobWallet] = this.allocated[jobWallet].add(gasCost).add(job.txObj.value);
-						} else {
-							console.warn(`WARN: Insufficient fund in wallet, skipping job ...`);
-							return;
-						}
-	
-						this.enqueue({...job, Q})(jobWallet);
-					})
+
+					try {	
+						jobObjList.map( (job) => 
+						{
+							this.setAccount(job.type)(job.txObj.from);
+							let jobWallet = this.userWallet[job.type];
+							let userBalance = this.web3.eth.getBalance(jobWallet);
+		
+							console.debug(` - Account: ${jobWallet}; Balance: ${userBalance} ETH`);
+		
+							let gasCost = new BigNumber(job.txObj.gas).times(this.gasPrice); 
+		
+							if (
+							        typeof(this.TokenList[job.contract]) === 'undefined'
+							     && typeof(job.type) !== 'undefined' 
+							     && job.type === 'Token'
+							     && userBalance.sub(this.allocated[jobWallet]).gte(gasCost)
+							) {
+								console.debug(`WARN: Unknown token ${job.contract}, skipping job ...`);
+								return;
+							} else if (
+						     	        typeof(this.CUE[job.type]) === 'undefined'
+						     	     || typeof(this.CUE[job.type][job.contract]) === 'undefined'
+							) {
+								console.warn(`WARN: Invalid call ${job.type}.${job.contract}.${job.call}, skipping job ...`);
+								return;
+							} else if (
+								job.type !== 'Web3' 
+							     && userBalance.sub(this.allocated[jobWallet]).gte(gasCost) 
+							) {
+								console.debug(`INFO: calling ${job.type}.${job.contract}.${job.call}, allocating gas fee from wallet: ${gasCost}`);
+								this.allocated[jobWallet] = this.allocated[jobWallet].add(gasCost);
+							} else if (
+								job.type === 'Web3' 
+							     && userBalance.sub(this.allocated[jobWallet]).sub(job.txObj.value).gte(gasCost) 
+							) {
+								console.debug(`INFO: sending Ether, allocating gas fee ${gasCost} and ether ${job.txObj.value} from wallet`);
+								this.allocated[jobWallet] = this.allocated[jobWallet].add(gasCost).add(job.txObj.value);
+							} else {
+								console.warn(`WARN: Insufficient fund in wallet, skipping job ...`);
+								return;
+							}
+		
+							this.enqueue({...job, Q})(jobWallet);
+						})
+					} catch(err) {
+						console.log(`In BIAPI ProcessJobs:`);
+						console.trace(err);
+						return;
+					}
 
 					this.allocated = {};	
 					return Q;
 				})
 				.then( (Q) => { return this.processQ(Q); })
-				.catch( (err) => { console.error(err); throw "ProcessJob failed, skipping QID..."; } );
+				.catch( (err) => { console.log("ProcessJob failed, skipping QID..."); return; } );
 		}
 
 		this.enqueueTx = tokenSymbol => (fromWallet, toAddress, amount, gasAmount) => 
@@ -1117,7 +1127,10 @@ server.register('sendTx', (args) => // sendTx(tokenSymbol, fromWallet, toAddress
 
 	try {
 		jobObj = biapi.enqueueTx(tokenSymbol)(fromWallet, toAddress, amount, gasAmount);
-		return biapi.processJobs([jobObj]); // single job, thus single element in list
+		return biapi.processJobs([jobObj])
+			    .then((Q) => { server.emit('newJobs', {qid: Q}); return Q; })
+			    .catch((err) => { return Promise.reject(err); }); // single job, thus single element in list
+
 	} catch (err) {
 		return Promise.reject(err);
 	}
@@ -1337,15 +1350,13 @@ server.register('canUseAccount', (args) =>
 server.event('newJobs');
 server.register('processJobs', (jobList) =>
 {
-	try {
-		return biapi.processJobs(jobList).then((Q) => 
-		{
-			server.emit('newJobs', {qid: Q});
-			return Q;
-		});
-	} catch (err) {
-		return Promise.reject(err);
-	}
+	return biapi.processJobs(jobList).then((Q) => 
+	{
+		if (Q === false || typeof(Q) === 'undefined') throw "ProcessJobs failed.";
+		server.emit('newJobs', {qid: Q, app: jobList[0].type });
+		return Q;
+	})
+	.catch((err) => { console.log(`In server processJobs method:`); console.trace(err); return Promise.reject(false) })
 });
 
 server.register('addrEtherBalance', (args = null) => // addrEtherBalance(address)
