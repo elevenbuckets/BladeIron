@@ -99,6 +99,7 @@ class BladeIron {
 
 		this.CUE = { 'Web3': { 'ETH': {'sendTransaction': this.web3.eth.sendTransaction } }, 'Token': {} };
                 Object.keys(allConditions).map( (f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] } );
+		this.groupCons = [];
 
 		this.setup = (cfgobj) => {
 			this.AToken = {};
@@ -458,8 +459,8 @@ class BladeIron {
 	                }
  
 	                //conditional function call
-	                let cfname;
-			if (jobObj.type === 'Token' || jobObj.type === 'Web3') {
+	                let cfname; let cfclass = String(`${jobObj.type}_${jobObj.contract}`).split('_').slice(0,2).join('_');
+			if (jobObj.type === 'Token' || jobObj.type === 'Web3' || this.groupCons.includes(cfclass)) {
 			// internal type were designed with reusable group condition in mind, 
 			// at the moment apps initialized by newApps would have to have specific 
 			// condition per contract, even if they can be under same group due to 
@@ -479,7 +480,11 @@ class BladeIron {
 			}
 
 			if (typeof(this[cfname]) === 'undefined') {
-	                       	throw new Error(`Invalid condition of jobObj: ${JSON.stringify(jobObj, 0, 2)}`);
+				if (!this.groupCons.includes(cfclass)) {
+	                       		throw `Invalid condition of jobObj: ${JSON.stringify(jobObj, 0, 2)}, Missing condition: ${jobObj.contract}_${jobObj.call}_${this.condition}`;
+				} else {
+	                       		throw `Invalid condition of jobObj: ${JSON.stringify(jobObj, 0, 2)}, Missing (group) condition: ${jobObj.type}_${jobObj.call}_${this.condition}`;
+				}
 			}
 
 	                if (this[cfname](addr, jobObj) == true) {
@@ -552,9 +557,12 @@ class BladeIron {
 		
 			                results = results.then( () => {
 		        	                return this.unlockViaIPC(passes)(addr).then(() => {
+							let fatal = false;
 		                	                this.jobQ[Q][addr].map((o, id) => 
 							{
 								try {
+									if (fatal) throw "previous job in queue failed, Abort!";
+
 			                        	        	let tx = this.CUE[o.type][o.contract][o.call](...o.args, o.txObj);
 									console.debug(`QID: ${Q} | ${o.type}: ${addr} doing ${o.call} on ${o.contract}, txhash: ${tx}`);
 		
@@ -582,6 +590,7 @@ class BladeIron {
 									        'call': o.call, ...o.txObj, 
 									        'amount': typeof(o['amount']) !== 'undefined' ? o.amount : null
 									});
+									fatal = true;
 								}
 		                                	})
 			                        }).then( () => {
@@ -886,10 +895,17 @@ class BladeIron {
 	                {
 	                        let thiscond = require(conditions[cond]);
 	                        allConditions = { ...allConditions, ...thiscond };
+
 	                });
-	
+
 	                // loading conditions. there names needs to follow CastIron conventions to be recognized by queue, otherwise job will fail.
-	                Object.keys(allConditions).map((f) => { if(typeof(this[`${appSymbol}_${f}`]) === 'undefined') this[`${appSymbol}_${f}`] = allConditions[f] });
+			if (typeof(allConditions.GROUP_CONDITION) !== 'undefined') { // group condition (PoC)
+				this.groupCons = new Set([ ...this.groupCons, `${appSymbol}_${thiscond.GROUP_CONDITION}` ]);
+				delete allConditions.GROUP_CONDITION;
+	                	Object.keys(allConditions).map((f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] });
+			} else {
+	                	Object.keys(allConditions).map((f) => { if(typeof(this[`${appSymbol}_${f}`]) === 'undefined') this[`${appSymbol}_${f}`] = allConditions[f] });
+			}
 
 			return { [appSymbol]: version, 'Ready': true };
 	        }
