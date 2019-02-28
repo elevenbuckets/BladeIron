@@ -712,7 +712,8 @@ class BladeIron {
 				{
 					console.debug(`Queue ID: ${Q}, Enqueuing ...`);
 
-					try {	
+					try {
+						let _count = 0;	
 						jobObjList.map( (job) => 
 						{
 							this.setAccount(job.type)(job.txObj.from);
@@ -755,10 +756,13 @@ class BladeIron {
 							}
 		
 							this.enqueue({...job, Q})(jobWallet);
+							_count++;
 						})
+
+						if (_count === 0) { delete this.jobQ[Q]; delete this.rcdQ[Q]; }
 					} catch(err) {
-						console.log(`In BIAPI ProcessJobs:`);
-						console.trace(err);
+						console.log(`In BIAPI ProcessJobs:`); console.trace(err);
+						delete this.jobQ[Q]; delete this.rcdQ[Q];
 						return;
 					}
 
