@@ -896,7 +896,7 @@ class BladeIron {
 	                // conditions is objects of {'condition_name1': condPath1, 'condition_name2': condPath2 ...}
 	                let allConditions = {};
 	
-			console.log(`DEBUG: Condition parsing for ${appName}: ${contract}...`);
+			console.log(`DEBUG: Condition parsing for ${appSymbol}: ${contract}...`);
 	                Object.keys(conditions).map((cond) =>
 	                {
 				console.log(` - ${conditions[cond]}`);
@@ -904,7 +904,7 @@ class BladeIron {
 	                        allConditions = { ...allConditions, ...thiscond };
 	                });
 
-			if (Object.keys(allConditions).length === 0) throw `WARNING: NO condition defined for ${appName}: ${contract}!!!`;
+			if (Object.keys(allConditions).length === 0) throw `WARNING: NO condition defined for ${appSymbol}: ${contract}!!!`;
 			console.dir(allConditions); 
 	                // loading conditions. there names needs to follow CastIron conventions to be recognized by queue, otherwise job will fail.
 			if (typeof(allConditions.GROUP_CONDITION) !== 'undefined') { // group condition (PoC)
