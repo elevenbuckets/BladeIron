@@ -487,20 +487,20 @@ class BladeIron {
 				}
 			}
 
+	                let args = job.args.map((e) =>
+	                {
+	                        if (typeof(job[e]) === 'undefined') {
+	                                throw new Error(`jobObj missing element ${e} for ${cfname} action`);
+	                        }
+
+                                return job[e];
+                        });
+	
 	                if (this[cfname](addr, jobObj) == true) {
-	                        let args = job.args.map((e) =>
-	                        {
-	                                if (typeof(job[e]) === 'undefined') {
-	                                        throw new Error(`jobObj missing element ${e} for ${cfname} action`);
-	                                }
-	
-	                                return job[e];
-	                        });
-	
 	                        this.jobQ[Q][addr].push({...job, args}); // replace 
-	
 	                        return true;
 	                } else {
+	                        this.jobQ[Q][addr].push({...job, args, cfc: cfname}); // replace 
 	                        return false;
 	                }
 	        }
@@ -562,10 +562,11 @@ class BladeIron {
 							{
 								try {
 									if (fatal) throw "previous job in queue failed, Abort!";
-
+									if (typeof(o.cfc) !== 'undefined') throw `job failed to pass condition ${o.cfc}`;
+								
 			                        	        	let tx = this.CUE[o.type][o.contract][o.call](...o.args, o.txObj);
 									console.debug(`QID: ${Q} | ${o.type}: ${addr} doing ${o.call} on ${o.contract}, txhash: ${tx}`);
-		
+
 								  	if (typeof(o['amount']) !== 'undefined') {
 								    		this.rcdQ[Q].push({id, addr, tx, 
 											'type': o.type, 
@@ -1441,13 +1442,24 @@ server.register('addrTokenBalance', (args) => // addrTokenBalance(tokenSymbol, a
 server.register('getReceipts', (args) => // getRecepts(Q)
 {
 	let Q = args[0];
-	let txhashes = biapi.rcdQ[Q].map((r) => { return r.tx });
-	try {
-		return biapi.getReceipt(txhashes);
-	} catch (err) {
-		console.log(err);
-		return Promise.reject(err);
-	}
+	let errRcds = {};
+	let txhashes = biapi.rcdQ[Q].map((r) => { 
+		if (r.tx === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+			errRcds[r.id] = r;
+		}
+		return r.tx;
+	});
+
+	return biapi.getReceipt(txhashes).then((rc) => {
+		return rc.map((t,i) => {
+			if (i in errRcds) {
+				return { ... errRcds[i], ...t };
+			} else {
+				return t;
+			}
+		})
+	})
+	.catch((err) => { console.trace(err); return Promise.reject(err); })
 });
 
 /*
