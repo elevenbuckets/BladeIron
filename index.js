@@ -99,7 +99,7 @@ class BladeIron {
 
 		this.CUE = { 'Web3': { 'ETH': {'sendTransaction': this.web3.eth.sendTransaction } }, 'Token': {} };
                 Object.keys(allConditions).map( (f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] } );
-		this.groupCons = [];
+		this.groupCons = new Set([]);
 
 		this.setup = (cfgobj) => {
 			this.AToken = {};
