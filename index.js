@@ -399,10 +399,10 @@ class BladeIron {
 	                return live;
 	        }
 
-		this.getReceipt = (txHash, interval) =>
+		this.getReceipt = (txHash, interval = 500) =>
 	        {
 	                if (txHash === '0x0000000000000000000000000000000000000000000000000000000000000000') {
-	                        return Promise.resolve({transactionHash: txHash});
+	                        return Promise.resolve({status: '0x0', transactionHash: txHash});
 	                }
 	
 	                const transactionReceiptAsync = (resolve, reject) => {
@@ -410,7 +410,7 @@ class BladeIron {
 	                                if (error) {
 	                                        reject(error);
 	                                } else if (receipt == null) {
-	                                        setTimeout( () => transactionReceiptAsync(resolve, reject), interval ? interval : 500);
+	                                        setTimeout( () => transactionReceiptAsync(resolve, reject), interval);
 	                                } else {
 	                                        resolve(receipt);
 	                                }
