@@ -460,7 +460,7 @@ class BladeIron {
  
 	                //conditional function call
 	                let cfname; let cfclass = String(`${jobObj.type}_${jobObj.contract}`).split('_').slice(0,2).join('_');
-			if (jobObj.type === 'Token' || jobObj.type === 'Web3' || this.groupCons.includes(cfclass)) {
+			if (jobObj.type === 'Token' || jobObj.type === 'Web3' || this.groupCons.has(cfclass)) {
 			// internal type were designed with reusable group condition in mind, 
 			// at the moment apps initialized by newApps would have to have specific 
 			// condition per contract, even if they can be under same group due to 
@@ -480,7 +480,7 @@ class BladeIron {
 			}
 
 			if (typeof(this[cfname]) === 'undefined') {
-				if (!this.groupCons.includes(cfclass)) {
+				if (!this.groupCons.has(cfclass)) {
 	                       		throw `Invalid condition of jobObj: ${JSON.stringify(jobObj, 0, 2)}, Missing condition: ${jobObj.contract}_${jobObj.call}_${this.condition}`;
 				} else {
 	                       		throw `Invalid condition of jobObj: ${JSON.stringify(jobObj, 0, 2)}, Missing (group) condition: ${jobObj.type}_${jobObj.call}_${this.condition}`;
@@ -896,16 +896,20 @@ class BladeIron {
 	                // conditions is objects of {'condition_name1': condPath1, 'condition_name2': condPath2 ...}
 	                let allConditions = {};
 	
+			console.log(`DEBUG: Condition parsing for ${appName}: ${contract}...`);
 	                Object.keys(conditions).map((cond) =>
 	                {
+				console.log(` - ${conditions[cond]}`);
 	                        let thiscond = require(conditions[cond]);
 	                        allConditions = { ...allConditions, ...thiscond };
-
 	                });
 
+			if (Object.keys(allConditions).length === 0) throw `WARNING: NO condition defined for ${appName}: ${contract}!!!`;
+			console.dir(allConditions); 
 	                // loading conditions. there names needs to follow CastIron conventions to be recognized by queue, otherwise job will fail.
 			if (typeof(allConditions.GROUP_CONDITION) !== 'undefined') { // group condition (PoC)
-				this.groupCons = new Set([ ...this.groupCons, `${appSymbol}_${thiscond.GROUP_CONDITION}` ]);
+				console.log(`DEBUG: Group Condition found: ${appSymbol}_${allConditions.GROUP_CONDITION}`);
+				this.groupCons = new Set([ ...this.groupCons, `${appSymbol}_${allConditions.GROUP_CONDITION}` ]);
 				delete allConditions.GROUP_CONDITION;
 	                	Object.keys(allConditions).map((f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] });
 			} else {
