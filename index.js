@@ -12,7 +12,7 @@ const uuid  = require('uuid/v4');
 const BigNumber = require('bignumber.js');
 const fetch     = require('node-fetch');
 const ipfsctl = require('ipfsd-ctl');
-const ipfsAPI = require('ipfs-api');
+const ipfsAPI = require('ipfs-http-client');
 const { execFileSync } = require('child_process');
 const ethUtils = require('ethereumjs-utils');
 
@@ -1016,12 +1016,12 @@ class IPFS_Blade {
 		this.put = (fpath) => 
 		{
                 	let buff = fs.readFileSync(fpath);
-                	return this.ipfsAPI.files.add(buff); // return a promise
+                	return this.ipfsAPI.add(buff); // return a promise
         	}
 
         	this.lspin = () => { return this.ipfsAPI.pin.ls(); }
-        	this.read = (hash) => { return this.ipfsAPI.files.cat('/ipfs/' + hash); }
-        	this.readPath = (ipfsPath) => { return this.ipfsAPI.files.cat(ipfsPath); }
+        	this.read = (hash) => { return this.ipfsAPI.cat('/ipfs/' + hash); }
+        	this.readPath = (ipfsPath) => { return this.ipfsAPI.cat(ipfsPath); }
 
         	this.publish = (contentHash, key=null) => {
                 	let options = {};
