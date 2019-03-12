@@ -24,7 +24,6 @@
     "bignumber.js": "^5.0.0",
     "buttercup": "1.6.2",
     "ethereumjs-utils": "^5.2.5",
-    "ipfs_base": "https://github.com/elevenbuckets/ipfs_go.git",
     "keythereum": "https://github.com/elevenbuckets/keythereum.git",
     "node-fetch": "^1.7.3",
     "rpc-websockets": "^4.3.5",
