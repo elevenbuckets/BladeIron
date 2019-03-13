@@ -1013,6 +1013,11 @@ class IPFS_Blade {
 			}); 
 		}
 
+		this.peerList = () => { return this.ipfsAPI.swarm.peers(); }
+		this.findPeer = (nodehash) => { return this.ipfsAPI.dht.findPeer(nodehash); }
+		this.swarmConnect = (multiAddr) => { return this.ipfsAPI.swarm.connect(multiAddr); }
+		this.swarmDisconnect = (multiAddr) => { return this.ipfsAPI.swarm.disconnect(multiAddr); }
+
 		this.put = (fpath) => 
 		{
                 	let buff = fs.readFileSync(fpath);
@@ -1109,18 +1114,6 @@ const observer = (sec = 3001) =>
 }
 
 let serverTimer;
-
-/*
-server.register('initialize', (obj) => 
-{
-	biapi.setup(obj); 
-	console.dir(obj);
- 	let sec = obj.observe_interval || 1001;
- 	serverTimer = observer(sec);
-
-	return biapi.connected();
-});
-*/
 
 server.register('accounts', () => { return biapi.allAccounts() });
 server.register('ethNetStatus', () => { return biapi.ethNetStatus() });
@@ -1470,17 +1463,6 @@ server.register('getReceipts', (args) => // getRecepts(Q)
 	.catch((err) => { console.trace(err); return Promise.reject(err); })
 });
 
-/*
-server.register('ipfs_initialize', (obj) =>
-{
-	ipfsi.init(obj);
-	ipfsi.start().then(() => 
-	{ 
-		return typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started; 
-	});		
-});
-*/
-
 server.register('ipfs_pullFile', (args) => // ipfs_pullFile(inhash, outpath)
 {
 	let inhash = args[0];
@@ -1579,6 +1561,35 @@ server.register('ipfs_setConfigs', (args) =>
         let value = args[1];
 
 	return ipfsi.setConfigs(entry, value);
+});
+
+server.register('ipfs_ping', (args) => 
+{
+	let nodehash = args[0];
+	return ipfsi.ping(nodehash);
+});
+
+server.register('ipfs_peerList', () => 
+{
+	return ipfsi.peerList();
+});
+
+server.register('ipfs_findPeer', (args) => 
+{
+	let nodehash = args[0];
+	return ipfsi.findPeer(nodehash);
+});
+
+server.register('ipfs_swarm_connect', (args) => 
+{
+	let multiAddr = args[0]; // such as: /ip4/172.17.0.1/tcp/8545
+	return ipfsi.swarmConnect(multiAddr);
+});
+
+server.register('ipfs_swarm_disconnect', (args) => 
+{
+	let multiAddr = args[0]; 
+	return ipfsi.swarmDisconnect(multiAddr);
 });
 
 // IPFS PUBSUB related
