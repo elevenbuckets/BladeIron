@@ -1568,6 +1568,19 @@ server.register('ipfs_lspin', () =>
 	} 
 });
 
+server.register('ipfs_getConfigs', () =>
+{
+	return ipfsi.getConfigs();
+});
+
+server.register('ipfs_setConfigs', (args) => 
+{
+	let entry = args[0];
+        let value = args[1];
+
+	return ipfsi.setConfigs(entry, value);
+});
+
 // IPFS PUBSUB related
 server.event('ipfs_pubsub_incomming');
 let __ipfs_pubsub_handler;
