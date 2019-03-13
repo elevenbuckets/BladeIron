@@ -1006,7 +1006,7 @@ class IPFS_Blade {
 		}
 
 		this.ping = (nodehash) => { return this.ipfsAPI.ping(nodehash, {count: 3}).then((r) => { return {cmd: r[0].text, count: 3, results: r[4]}}) }
-		this.getConfigs = () => { return this.ipfsAPI.config.get().then((b) => { return JSON.parse(b.toString())}); }
+		this.getConfigs = () => { return this.ipfsAPI.config.get().then((b) => { return b; }); }
 		this.setConfigs = (entry, value) => { 
 			return this.ipfsAPI.config.set(entry, value).then( () => { 
 				return this.ipfsAPI.config.get(entry).then((r) => { return { [entry]: r } });
