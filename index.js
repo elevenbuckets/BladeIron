@@ -1317,13 +1317,10 @@ server.register('gasPriceEst', () =>
 server.register('canUseAccount', (args) =>
 {
 	let address = args[0];
-        //if (biapi.allAccounts().indexOf(address) === -1) return Promise.reject('Account not found');
-        try {
-                return biapi.managedAddress(address);
-        } catch(err) {
+        return biapi.managedAddress(address).catch((err) => {
 		console.log(err);
-                return Promise.reject(err);
-        }	
+                return false;
+	})
 });
 
 server.event('newJobs');
@@ -1355,12 +1352,9 @@ server.register('addrEtherBalance', (args = null) => // addrEtherBalance(address
 			return Promise.reject(err);
 		}
 	} else {
-		let addressList = biapi.allAccounts();
-		try {
+		return biapi.allAccounts().then((addressList) => {
 			return Promise.all(addressList.map((addr) => { return {[addr]: biapi.addrEtherBalance(addr)} }));
-		} catch(err) {
-			return Promise.reject(err);
-		}
+		}).catch((err) => { return err; })
 	}
 });
 
