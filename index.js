@@ -96,6 +96,7 @@ class BladeIron {
                 };
 
 		this.abi  = abi;
+		this.toHex   = (input) => { return this.web3.toHex(input) };
 
 		this.CUE = { 'Web3': { 'ETH': {'sendTransaction': this.web3.eth.sendTransaction } }, 'Token': {} };
                 Object.keys(allConditions).map( (f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] } );
@@ -217,7 +218,7 @@ class BladeIron {
 	                return stage;
 	        }
 	
-		this.allAccounts = () => { return this.web3.eth.accounts; }
+		this.allAccounts = () => { return this.web3.eth.accounts; } // should parse local keystore files and collect addresses instead
 
 		this.ethNetStatus = () =>
 	        {
@@ -364,11 +365,11 @@ class BladeIron {
 		this.gasCostEst = (addr, txObj) =>
 	        {
 	                if (
-	                        txObj.hasOwnProperty('gas') == false
+	                        txObj.hasOwnProperty('gasLimit') == false
 	                     || txObj.hasOwnProperty('gasPrice') == false
 	                ) { throw new Error("txObj does not contain gas-related information"); }
 	
-	                let gasBN = this.web3.toBigNumber(txObj.gas);
+	                let gasBN = this.web3.toBigNumber(txObj.gasLimit);
 	                let gasPriceBN = this.web3.toBigNumber(txObj.gasPrice);
 	                let gasCost = gasBN.mul(gasPriceBN);
 	
@@ -505,41 +506,38 @@ class BladeIron {
 
 			                        	        	let data;
 			                        	        	let tx;
-									this.web3.eth.getTransactionCount(addr, (err, nonce) => 
-									{
-										if (err) throw 'Error when getting tx nonce for ' + addr;
-		                        	        			if (o.type !== 'Web3') {
-		                        	        				data = this.CUE[o.type][o.contract][o.call].getData(...o.args);
-											tx = new EthTx({ ...o.txObj, data, chainID: this.networkID});
-										} else {
-											tx = new EthTx({ ...o.txObj, chainID: this.networkID});
-										}
-										tx.sign(p.pkey);
-										this.web3.eth.sendRawTransaction(ethUtils.bufferToHex(tx.serialize()), (err, txHash) => {
-											if (err) { console.trace(err); throw 'Error when send raw transaction'; }
-											console.debug(`QID: ${Q} | ${o.type}: ${addr} doing ${o.call} on ${o.contract}, txhash: ${txHash}`);
+									let nonce = this.web3.eth.getTransactionCount(addr);
+									nonce = nonce + id;
+		                       	        			if (o.type !== 'Web3') {
+		                       	        				data = this.CUE[o.type][o.contract][o.call].getData(...o.args);
+										tx = new EthTx({ ...o.txObj, nonce, data, chainID: this.networkID});
+									} else {
+										tx = new EthTx({ ...o.txObj, nonce, chainID: this.networkID});
+									}
+									tx.sign(p.pkey);
+									let txHash = this.web3.eth.sendRawTransaction(ethUtils.bufferToHex(tx.serialize()));
 
-										  	if (typeof(o['amount']) !== 'undefined') {
-										    		this.rcdQ[Q].push({id, addr, txHash, 
-													'type': o.type, 
-													'contract': o.contract, 
-													'call': o.call, ...o.txObj, 
-													'amount': o.amount
-												});
-										  	} else {
-										    		this.rcdQ[Q].push({id, addr, txHash, 
-													'type': o.type, 
-													'contract': o.contract, 
-													'call': o.call, ...o.txObj,
-											        	'amount': null
-												});
-										  	}
-										})
-									});
-
+								  	if (typeof(o['amount']) !== 'undefined') {
+								    		this.rcdQ[Q].push({id, addr, 
+											'tx': txHash, 
+											'type': o.type, 
+											'contract': o.contract, 
+											'call': o.call, ...o.txObj, 
+											'amount': o.amount
+										});
+								  	} else {
+								    		this.rcdQ[Q].push({id, addr, 
+											'tx': txHash, 
+											'type': o.type, 
+											'contract': o.contract, 
+											'call': o.call, ...o.txObj,
+									        	'amount': null
+										});
+								  	}
 								} catch(error) {
 									console.trace(error);
-									this.rcdQ[Q].push({id, addr, error,
+									this.rcdQ[Q].push({id, addr, 
+										'error': error.toString(),
 										'tx': '0x0000000000000000000000000000000000000000000000000000000000000000',
 									        'type': o.type, 
 									        'contract': o.contract, 
@@ -569,7 +567,7 @@ class BladeIron {
 	
 			const __closeQ = (resolve, reject) => {
 				if (Object.keys(this.jobQ[Q]).length == 0) {
-					delete this.jobQ[Q];
+					delete this.jobQ[Q]; console.log(`DEBUG: Resolving ${Q}`)
 					resolve(Q);
 				} else if (Object.keys(this.jobQ[Q]).length > 0 && this.connected()) {
 					setTimeout( () => __closeQ(resolve, reject), 500 );
@@ -660,7 +658,7 @@ class BladeIron {
 		
 							console.debug(` - Account: ${jobWallet}; Balance: ${userBalance} ETH`);
 		
-							let gasCost = new BigNumber(job.txObj.gas).times(this.gasPrice); 
+							let gasCost = new BigNumber(job.txObj.gasLimit).times(this.gasPrice); 
 		
 							if (
 							        typeof(this.TokenList[job.contract]) === 'undefined'
@@ -738,9 +736,10 @@ class BladeIron {
 					contract: 'ETH',
 					call: 'sendTransaction',
 					args: [],
-					txObj: { from: fromWallet, to: toAddress, value: amount, gas: gasAmount, gasPrice: this.gasPrice } 
+					txObj: { from: fromWallet, to: toAddress, value: this.toHex(amount), gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) } 
 				}
 			} else {
+				let tokenAddr = this.CUE['Token'][tokenSymbol].address;
 				return {
 					Q: undefined,
 					type: 'Token',
@@ -749,7 +748,7 @@ class BladeIron {
 					args: ['toAddress', 'amount'],
 					toAddress,
 					amount,
-					txObj: { from: fromWallet, gas: gasAmount, gasPrice: this.gasPrice }
+					txObj: { from: fromWallet, to: tokenAddr, gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) }
 				}
 			}
 		}
@@ -779,11 +778,13 @@ class BladeIron {
 	                ){
 	                        throw "enqueueTk: Invalid element in txObj";
 	                };
+
+			let toAddress = this.CUE[type][contract].address;
 	
 	                if (amount === null) {
-	                        txObj = { from: fromWallet, gas: gasAmount, gasPrice: this.gasPrice }
+	                        txObj = { from: fromWallet, to: toAddress, gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) }
 	                } else if (amount > 0) {
-	                        txObj = { from: fromWallet, value: amount, gas: gasAmount, gasPrice: this.gasPrice }
+	                        txObj = { from: fromWallet, to: toAddress, value: this.toHex(amount), gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) }
 	                }
 	
 	                return { Q: undefined, type, contract, call, args, ...tkObj, txObj };
@@ -1301,14 +1302,13 @@ server.register('gasPriceEst', () =>
 server.register('canUseAccount', (args) =>
 {
 	let address = args[0];
-                if (biapi.allAccounts().indexOf(address) === -1) return Promise.reject('Account not found');
-
-                try {
-                        return biapi.managedAddress(address);
-                } catch(err) {
+        //if (biapi.allAccounts().indexOf(address) === -1) return Promise.reject('Account not found');
+        try {
+                return biapi.managedAddress(address);
+        } catch(err) {
 		console.log(err);
-                        return Promise.reject(err);
-                }	
+                return Promise.reject(err);
+        }	
 });
 
 server.event('newJobs');
