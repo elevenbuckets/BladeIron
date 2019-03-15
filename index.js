@@ -15,6 +15,7 @@ const ipfsctl = require('ipfsd-ctl');
 const ipfsAPI = require('ipfs-http-client');
 const { execFileSync } = require('child_process');
 const ethUtils = require('ethereumjs-utils');
+const EthTx = require('ethereumjs-tx');
 
 // account manager
 const bcup  = require('buttercup');
@@ -95,7 +96,6 @@ class BladeIron {
                 };
 
 		this.abi  = abi;
-		this.ipc3 = new Web3();
 
 		this.CUE = { 'Web3': { 'ETH': {'sendTransaction': this.web3.eth.sendTransaction } }, 'Token': {} };
                 Object.keys(allConditions).map( (f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] } );
@@ -106,7 +106,6 @@ class BladeIron {
 			this.allocated = {};
 			this.configs = cfgobj;
 	                this.rpcAddr = this.configs.rpcAddr || null;
-        	        this.ipcPath = this.configs.ipcPath || null;
 			this.networkID = this.configs.networkID || 'NO_CONFIG';
 	                this.condition = this.configs.condition || null; // 'sanity' or 'fulfill'
 	                this.archfile  = this.configs.passVault || null;
@@ -195,31 +194,7 @@ class BladeIron {
 	
 	                return new Promise(__connectRPC);
 	        }
-	
-		this.connectIPC = () => 
-		{
-	                const __connectIPC = (resolve, reject) => {
-	                        try {
-	                                if (
-	                                    this.ipc3 instanceof Web3
-	                                 && this.ipc3.net._requestManager.provider instanceof Web3.providers.IpcProvider
-	                                ) {
-	                                        resolve(true);
-	                                } else if (this.ipc3 instanceof Web3) {
-	                                        this.ipc3.setProvider(new Web3.providers.IpcProvider(this.ipcPath, net));
-	                                        resolve(true);
-	                                } else {
-	                                        reject(false);
-	                                }
-	                        } catch (err) {
-	                                console.log(err);
-	                                reject(false);
-	                        }
-	                }
-	
-	                return new Promise(__connectIPC);
-	        }	
-	
+
 		this.connect = () => {
 	                let stage = Promise.resolve();
 	
@@ -229,7 +204,7 @@ class BladeIron {
 	                .then((rc) => {
 	                        if (rc) {
 					this.TokenABI  = this.web3.eth.contract(EIP20ABI);
-	                                return this.connectIPC();
+					return rc;
 	                        } else {
 	                                throw("no connection");
 	                        }
@@ -336,23 +311,6 @@ class BladeIron {
 	        this.toWei = (eth, decimals) => new BigNumber(String(eth)).times(new BigNumber(10 ** decimals)).floor();
         	this.hex2num = (hex) => new BigNumber(String(hex)).toString();
 
-		this.unlockViaIPC = passwd => addr =>
-	        {
-	                const __unlockToExec = (resolve, reject) => {
-	                        this.ipc3.personal.unlockAccount(addr, passwd, 120, (error, result) => {
-	                                if (error) {
-	                                        reject(error);
-	                                } else if (result != true) {
-	                                        setTimeout( () => __unlockToExec(resolve, reject), 500 );
-	                                } else {
-	                                        resolve(true);
-	                                }
-	                        });
-	                };
-	
-	                return new Promise(__unlockToExec);
-	        }
-
 		this.configured = () => 
 		{
                 	if (this.networkID === 'NO_CONFIG') {
@@ -361,29 +319,6 @@ class BladeIron {
                         	return true;
                 	}
         	}
-
-		this.closeIPC = () =>
-	        {
-	                const __closeIPC = (resolve, reject) => {
-	                        try {
-	                                if (
-	                                    this.ipc3 instanceof Web3
-	                                 && this.ipc3.net._requestManager.provider instanceof Web3.providers.IpcProvider
-	                                ) {
-	                                        console.log("Shutdown ipc connection!!!");
-	                                        resolve(this.ipc3.net._requestManager.provider.connection.destroy());
-	                                } else if (this.ipc3 instanceof Web3) {
-	                                        console.log("Still pending to shutdown ipc connection!!!");
-	                                        setTimeout( () => __closeIPC(resolve, reject), 500 );
-	                                }
-	                        } catch (err) {
-	                                console.log("Uh Oh...... (closeIPC)" + err);
-	                                reject(false);
-	                        }
-	                };
-	
-	                return new Promise(__closeIPC);
-	        }
 
 		this.connected = () => 
 		{
@@ -556,7 +491,9 @@ class BladeIron {
 		                	}
 		
 			                results = results.then( () => {
-		        	                return this.unlockViaIPC(passes)(addr).then(() => {
+		        	                return recover(addr, passes, this.configs.datadir).then((p) => {
+                                                if(!p.rc) throw "failed to unlock account";
+
 							let fatal = false;
 		                	                this.jobQ[Q][addr].map((o, id) => 
 							{
@@ -564,24 +501,42 @@ class BladeIron {
 									if (fatal) throw "previous job in queue failed, Abort!";
 									if (typeof(o.cfc) !== 'undefined') throw `job failed to pass condition ${o.cfc}`;
 								
-			                        	        	let tx = this.CUE[o.type][o.contract][o.call](...o.args, o.txObj);
-									console.debug(`QID: ${Q} | ${o.type}: ${addr} doing ${o.call} on ${o.contract}, txhash: ${tx}`);
+			                        	        	//let tx = this.CUE[o.type][o.contract][o.call](...o.args, o.txObj);
 
-								  	if (typeof(o['amount']) !== 'undefined') {
-								    		this.rcdQ[Q].push({id, addr, tx, 
-											'type': o.type, 
-											'contract': o.contract, 
-											'call': o.call, ...o.txObj, 
-											'amount': o.amount
-										});
-								  	} else {
-								    		this.rcdQ[Q].push({id, addr, tx, 
-											'type': o.type, 
-											'contract': o.contract, 
-											'call': o.call, ...o.txObj,
-										        'amount': null
-										});
-								  	}
+			                        	        	let data;
+			                        	        	let tx;
+									this.web3.eth.getTransactionCount(addr, (err, nonce) => 
+									{
+										if (err) throw 'Error when getting tx nonce for ' + addr;
+		                        	        			if (o.type !== 'Web3') {
+		                        	        				data = this.CUE[o.type][o.contract][o.call].getData(...o.args);
+											tx = new EthTx({ ...o.txObj, data, chainID: this.networkID});
+										} else {
+											tx = new EthTx({ ...o.txObj, chainID: this.networkID});
+										}
+										tx.sign(p.pkey);
+										this.web3.eth.sendRawTransaction(ethUtils.bufferToHex(tx.serialize()), (err, txHash) => {
+											if (err) { console.trace(err); throw 'Error when send raw transaction'; }
+											console.debug(`QID: ${Q} | ${o.type}: ${addr} doing ${o.call} on ${o.contract}, txhash: ${txHash}`);
+
+										  	if (typeof(o['amount']) !== 'undefined') {
+										    		this.rcdQ[Q].push({id, addr, txHash, 
+													'type': o.type, 
+													'contract': o.contract, 
+													'call': o.call, ...o.txObj, 
+													'amount': o.amount
+												});
+										  	} else {
+										    		this.rcdQ[Q].push({id, addr, txHash, 
+													'type': o.type, 
+													'contract': o.contract, 
+													'call': o.call, ...o.txObj,
+											        	'amount': null
+												});
+										  	}
+										})
+									});
+
 								} catch(error) {
 									console.trace(error);
 									this.rcdQ[Q].push({id, addr, error,
@@ -594,24 +549,7 @@ class BladeIron {
 									fatal = true;
 								}
 		                                	})
-			                        }).then( () => {
-		        	                        this.ipc3.personal.lockAccount(addr, (error, r) => {
-		                        	                if (error) {
-									console.trace(error);
-									this.rcdQ[Q].push({
-									  	'id': null, addr, error,
-									  	'tx': '0x0000000000000000000000000000000000000000000000000000000000000000', 
-									  	'type': 'ipc3', 
-									  	'contract': 'personal', 
-									  	'call': 'lockAccount',
-									  	'amount': null
-								  	});
-								}
-		
-		                	                        console.debug(`** account: ${addr} is now locked`);
-								delete this.jobQ[Q][addr];
-			                                });
-		        	                })
+			                        }).then( () => { delete this.jobQ[Q][addr]; })
 		                	}).catch( (error) => { console.trace(error); delete this.jobQ[Q][addr]; return Promise.resolve(); } );
 		        	}); 
 			
@@ -633,7 +571,7 @@ class BladeIron {
 				if (Object.keys(this.jobQ[Q]).length == 0) {
 					delete this.jobQ[Q];
 					resolve(Q);
-				} else if (Object.keys(this.jobQ[Q]).length > 0 && this.ipc3 && this.ipc3.hasOwnProperty('net') == true){
+				} else if (Object.keys(this.jobQ[Q]).length > 0 && this.connected()) {
 					setTimeout( () => __closeQ(resolve, reject), 500 );
 				} else {
 					console.error("Uh Oh...... (closeQ)");
