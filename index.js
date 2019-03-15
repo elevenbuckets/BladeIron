@@ -16,6 +16,7 @@ const ipfsAPI = require('ipfs-http-client');
 const { execFileSync } = require('child_process');
 const ethUtils = require('ethereumjs-utils');
 const EthTx = require('ethereumjs-tx');
+const { promisify } = require('util');
 
 // account manager
 const bcup  = require('buttercup');
@@ -218,7 +219,21 @@ class BladeIron {
 	                return stage;
 	        }
 	
-		this.allAccounts = () => { return this.web3.eth.accounts; } // should parse local keystore files and collect addresses instead
+		//this.allAccounts = () => { return this.web3.eth.accounts; } // should parse local keystore files and collect addresses instead
+		this.allAccounts = () =>
+		{
+			const readdir = promisify(fs.readdir);
+			const readfile = promisify(fs.readFile);
+			let keydir = path.join(this.configs.datadir, 'keystore');
+			return readdir(keydir).then((list) => 
+			{
+				let p = list.map((f) => { return readfile(path.join(keydir,f)).then((b) => { 
+					return JSON.parse(b.toString()).address }).catch((e) => { return null });  
+				});
+
+				return Promise.all(p).then((results) => { let r = results.filter((i) => { return i !== null }); return Array.from(new Set(r)) });
+			})
+		}
 
 		this.ethNetStatus = () =>
 	        {
