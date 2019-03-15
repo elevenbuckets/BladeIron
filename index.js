@@ -228,7 +228,7 @@ class BladeIron {
 			return readdir(keydir).then((list) => 
 			{
 				let p = list.map((f) => { return readfile(path.join(keydir,f)).then((b) => { 
-					return JSON.parse(b.toString()).address }).catch((e) => { return null });  
+					return '0x' + JSON.parse(b.toString()).address }).catch((e) => { return null });  
 				});
 
 				return Promise.all(p).then((results) => { let r = results.filter((i) => { return i !== null }); return Array.from(new Set(r)) });
