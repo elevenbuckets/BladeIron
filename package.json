@@ -27,6 +27,7 @@
     "ethereumjs-utils": "^5.2.5",
     "keythereum": "https://github.com/elevenbuckets/keythereum.git",
     "node-fetch": "^1.7.3",
+    "pubsub-swarm": "^1.0.0",
     "rpc-websockets": "^4.3.5",
     "uuid": "^3.1.0",
     "web3": "^0.19",
