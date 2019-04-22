@@ -886,7 +886,7 @@ class IPFS_Blade {
 		this.init = (cfgobj) => {
 			try {
                         	this.cfsrc = cfgobj;
-                        	this.options = {args: ['--enable-pubsub-experiment'], disposable: false, init: true, repoPath: this.cfsrc.repoPathGo};
+                        	this.options = {args: [], disposable: false, init: true, repoPath: this.cfsrc.repoPathGo};
 
                         	if (typeof(this.cfsrc.ipfsBinary) === 'undefined') {
                                 	let goipfspath = path.dirname(path.dirname(require.resolve('go-ipfs-dep')));
@@ -899,7 +899,7 @@ class IPFS_Blade {
                                 	lockerpathgo: '/tmp/.locker_go',
                                 	ipfsBinary: __asar_unpacked(path.join(goipfspath, 'go-ipfs', 'ipfs'))
                         	};
-                        	this.options = {args: ['--enable-pubsub-experiment'], disposable: true, init: true, repoPath: this.cfsrc.repoPathGo};
+                        	this.options = {args: [], disposable: true, init: true, repoPath: this.cfsrc.repoPathGo};
                 	}
 
                 	if (this.options.disposable === false && fs.existsSync(this.cfsrc.lockerpathgo)) this.options.init = false;
@@ -1539,72 +1539,71 @@ server.register('ipfs_swarm_disconnect', (args) =>
 	return ipfsi.swarmDisconnect(multiAddr);
 });
 
-// IPFS PUBSUB related
-server.event('ipfs_pubsub_incomming');
-let __ipfs_pubsub_handler;
-let pubsub_topics = {};
+// PUBSUB related 
+// Crrently, the simple pubsub-swarm modification only support single topic.
+// Topic switching is possible, but only tracking and interacting with single topic at any time.
+const Pubsub = require('./pubSubNode.js');
+const pubsub = new Pubsub();
 
-server.register('ipfs_pubsub_subscribe', (args) => 
+pubsub.connectP2P();
+
+server.event('pubsub_incomming');
+server.register('pubsub_subscribe', (args) => 
 {	
 	let topic = args[0];
 
-	if (topic in pubsub_topics) return true;
+	if (topic === pubsub.topic) return true;
 
-	__ipfs_pubsub_handler = (msg) => { 
-		return server.emit('ipfs_pubsub_incomming', {topic, msg, timestamp: Date.now()});
+	let __pubsub_handler = (msg) => { 
+		return server.emit('pubsub_incomming', {topic, msg, timestamp: Date.now()});
 	}
 
-	const __promise_ipfs_pubsub = (topic) => (resolve, reject) => 
+	const __promise_pubsub = (topic) => (resolve, reject) => 
 	{
-		ipfsi.ipfsAPI.pubsub.subscribe(topic, __ipfs_pubsub_handler, {discover: true}, (err) => 
-		{ 
-			if (err) {
-				reject(err);
-			} else {
-				pubsub_topics[topic] = true;
-				resolve(true);
-			}
-		})
+		try {
+			pubsub.join(topic);
+			pubsub.setIncommingHandler(__pubsub_handler); 
+			resolve(true);
+		} catch (err) { 
+			reject(err);
+		}
 	}
 
-	return new Promise(__promise_ipfs_pubsub(topic));
+	return new Promise(__promise_pubsub(topic));
 });
 
-server.register('ipfs_pubsub_unsubscribe', (args) => 
+server.register('pubsub_unsubscribe', (args) => 
 {
 	let topic = args[0];
 
-	const __promise_ipfs_unpubsub = (topic) => (resolve, reject) => 
+	const __promise_unpubsub = (topic) => (resolve, reject) => 
 	{
-		ipfsi.ipfsAPI.pubsub.unsubscribe(topic, __ipfs_pubsub_handler, (err) => 
-		{ 
-			if (err) {
-				reject(err);
-			} else {
-				delete pubsub_topics[topic];
-				resolve(true);
-			}
-		})
+		try {
+			pubsub.leave(topic);
+			pubsub.removeAllListeners(topic);
+			resolve(true);
+		} catch (err) {
+			reject(err);
+		}
 	}
 
-	return new Promise(__promise_ipfs_unpubsub(topic));
+	return new Promise(__promise_unpubsub(topic));
 });
 
-server.register('ipfs_pubsub_publish', (args) => 
+server.register('pubsub_publish', (args) => 
 {
 	let topic = args[0];
 	let data  = Buffer.from(args[1], 'utf8');
 
-	const __promise_ipfs_pubsub_data = (topic) => (data) => (resolve, reject) => 
+	const __promise_pubsub_data = (topic) => (data) => (resolve, reject) => 
 	{
-		ipfsi.ipfsAPI.pubsub.publish(topic, data, (err) => 
+		try {
+			if (pubsub.topic !== topic) return reject("topic mismatch.");
+			pubsub.publish(data); 
+			resolve(true);
+		} catch (err) {
+			reject(err);
 		{ 
-			if (err) {
-				reject(err);
-			} else {
-				resolve(true);
-			}
-		})
 	}
 
 	return new Promise(__promise_ipfs_pubsub_data(topic)(data));
