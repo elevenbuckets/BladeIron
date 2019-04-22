@@ -1603,7 +1603,7 @@ server.register('pubsub_publish', (args) =>
 			resolve(true);
 		} catch (err) {
 			reject(err);
-		{ 
+		} 
 	}
 
 	return new Promise(__promise_ipfs_pubsub_data(topic)(data));
@@ -1786,6 +1786,9 @@ server.event('synctokens', '/controlPanel');
 
 process.on('SIGINT', () => {
    console.log("\tRPC Server stopping ...");
+   pubsub.leave();
+   pubsub.swarm.close();
+
    if (typeof(ipfsi.controller) !== 'undefined' && ipfsi.controller.started) {
 	console.log("\tIPFS Server stopping ...");
 	ipfsi.stop().then(() => {
