@@ -1552,7 +1552,6 @@ server.register('pubsub_subscribe', (args) =>
 	let topic = args[0];
 
 	__pubsub_handler = (msg) => {
-		console.log('websocket event emitted'); 
 		return server.emit('pubsub_incomming', {topic, msg, timestamp: Date.now()});
 	}
 
@@ -1624,10 +1623,8 @@ server.register('fully_initialize', (obj) =>
 	let gethChk = biapi.connected();
 	let ipfsChk = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started;
 
-	console.log("DEBUG:");
-	console.log(obj);
-	console.log({gethChk});
-	console.log({ipfsChk});
+	console.log("Received Configs:");
+	console.dir(obj);
 
 	biapi.setup(gethCfg);
 	ipfsi.init(ipfsCfg);
