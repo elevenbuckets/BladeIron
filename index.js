@@ -1540,8 +1540,6 @@ server.register('ipfs_swarm_disconnect', (args) =>
 });
 
 // PUBSUB related 
-// Crrently, the simple pubsub-swarm modification only support single topic.
-// Topic switching is possible, but only tracking and interacting with single topic at any time.
 const Pubsub = require('./pubsubNode.js');
 let __pubsub_handler;
 let pubsub;
