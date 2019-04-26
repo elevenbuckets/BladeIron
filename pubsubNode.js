@@ -61,30 +61,33 @@ class PubSub extends EventEmitter
 	constructor(options) {
 		super();
 
-		let opts = options || { gossip: {} };
-		this.gossip = gossip(opts.gossip);
-  		this.id = this.gossip.keys.public; // should eventually use ETH address
-  		this.swarm = swarm();
+		let opts = { gossip: {}, ...options };
 		this.port  = opts.port || 0;
+  		this.swarm = swarm(opts);
+		this.topicList = [];
+		this.firstConn = false;
+		this.initialized = false;
 
 		this.join = (topic) =>
 		{
   			if (!topic || typeof topic !== 'string') { throw new Error('topic must be set as a string') }
-			if (typeof this.topic !== 'undefined') this.leave();
-			this.topic = topic;
 			this.seen  = { init: Math.floor(Date.now()/1000), logs: {}, seen: {} };
-  			return this.swarm.join(this.topic);
+			this.topicList.push(topic);
+  			return this.swarm.join(topic);
 		}
 
-		this.leave = () =>
+		this.leave = (topic) =>
 		{
-			if (typeof this.topic === 'undefined') return true;
-			return this.swarm.leave(this.topic);
+			if (this.topicList.indexOf(topic) === -1) return true;
+			this.topicList.splice(this.topicList.indexOf(topic), 1);
+			return this.swarm.leave(topic);
 		}
 
 		this.stats = () =>
 		{
 			return {
+				topics: this.topicList,
+				peerseen: this.swarm._peersSeen,
 				connecting: this.swarm.connecting,
 				upcomming: this.swarm.queued,
 				connected: this.swarm.connected
@@ -107,16 +110,19 @@ class PubSub extends EventEmitter
 
 		  	this.gossip.on('message', (msg) => {
 				//console.log('get Message'); console.dir(msg);
-				if (this.filterSeen(msg) && this.throttlePeer(msg.data)) {
+				if (this.filterSeen(msg) && this.throttlePeer(msg.data) && this.validateMsg(msg.data) ) {
 					this.emit('incomming', msg);
-					console.log('message passed filters, incomming event emitted...');
 				}
   			})
 
-			this.firstConn = false;
+			// default dummy incomming handler
+			this.on('incomming', (msg) => { 
+				console.log('message passed filters, incomming event emitted...');
+			});
+
   			this.swarm.on('connection', (connection) => 
 			{
-    				console.log('found ' + this.swarm.connected + ' connected to peer');
+    				console.log("\nFound " + this.swarm.connected + ' connected ' + (this.swarm.connected === 1 ? 'peer' : 'peers') );
     				let g = this.gossip.createPeerStream();
     				connection.pipe(g).pipe(connection);
 
@@ -125,6 +131,8 @@ class PubSub extends EventEmitter
       					this.emit('connected');
     				}
   			});
+
+			this.initialized = true;
 		}
 
 		// encode if packet is object, decode if it is RLPx
@@ -174,21 +182,22 @@ class PubSub extends EventEmitter
 
 		this.validateMsg = (msg) =>
 		{
-			// for now, only validate RLPx format, will also validate RLPx payload signature and confirm active membership via smart contract.
-			/*
-			try {
-				this.handleRLPx(fields)(msg);
-				return true;
-			} catch (err) {
-				return false;
-			}
-			*/
-			return true; // temp fix for testing
+			// - msg requires to contain "topic"
+			if (typeof(msg.topic) === 'undefined') return false;
+			// - topic needs to be in this.topicList
+			if (this.topicList.length === 0 || this.topicList.indexOf(msg.topic) === -1) return false;
+
+			// TODO: things to check
+			// - based on topic, msg should be specific encoded RLPx
+			// - all necessary RLP field tests
+			// - signature matches
+			return true; // place holder
 		}
 
-		this.publish = (msg) =>
+		this.publish = (topic, msg) =>
 		{
-			if (typeof(msg) !== 'object') msg = { data: {msg, public: this.id} }; // secure-gossip requires the key named "data" ...
+			if (this.topicList.length === 0 || this.topicList.indexOf(topic) === -1) return false; 
+			msg = { data: {topic, msg, public: this.id} }; // secure-gossip requires the key named "data" ...
     			return this.gossip.publish(msg)
 		}
 
@@ -201,7 +210,6 @@ class PubSub extends EventEmitter
 		}
 
   		this.swarm.listen(this.port);
-
 	}
 }
 

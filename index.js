@@ -1543,18 +1543,16 @@ server.register('ipfs_swarm_disconnect', (args) =>
 // Crrently, the simple pubsub-swarm modification only support single topic.
 // Topic switching is possible, but only tracking and interacting with single topic at any time.
 const Pubsub = require('./pubsubNode.js');
-const pubsub = new Pubsub();
-
-pubsub.connectP2P();
+let __pubsub_handler;
+let pubsub;
 
 server.event('pubsub_incomming');
 server.register('pubsub_subscribe', (args) => 
 {	
 	let topic = args[0];
 
-	if (topic === pubsub.topic) return true;
-
-	let __pubsub_handler = (msg) => { 
+	__pubsub_handler = (msg) => {
+		console.log('websocket event emitted'); 
 		return server.emit('pubsub_incomming', {topic, msg, timestamp: Date.now()});
 	}
 
@@ -1564,7 +1562,8 @@ server.register('pubsub_subscribe', (args) =>
 			pubsub.join(topic);
 			pubsub.setIncommingHandler(__pubsub_handler); 
 			resolve(true);
-		} catch (err) { 
+		} catch (err) {
+			console.trace(err); 
 			reject(err);
 		}
 	}
@@ -1583,7 +1582,8 @@ server.register('pubsub_unsubscribe', (args) =>
 			pubsub.removeAllListeners(topic);
 			resolve(true);
 		} catch (err) {
-			reject(err);
+			console.trace(err);
+			reject(false);
 		}
 	}
 
@@ -1598,15 +1598,14 @@ server.register('pubsub_publish', (args) =>
 	const __promise_pubsub_data = (topic) => (data) => (resolve, reject) => 
 	{
 		try {
-			if (pubsub.topic !== topic) return reject("topic mismatch.");
-			pubsub.publish(data); 
-			resolve(true);
+			resolve(pubsub.publish(topic, data)); 
 		} catch (err) {
-			reject(err);
+			console.trace(err);
+			reject(false);
 		} 
 	}
 
-	return new Promise(__promise_ipfs_pubsub_data(topic)(data));
+	return new Promise(__promise_pubsub_data(topic)(data));
 });
 
 server.register('full_checks', () =>
@@ -1621,6 +1620,7 @@ server.register('fully_initialize', (obj) =>
 {
 	let gethCfg = obj.geth;
 	let ipfsCfg = obj.ipfs;
+	let ps2pCfg = obj.pubsub;
 	let gethChk = biapi.connected();
 	let ipfsChk = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started;
 
@@ -1631,6 +1631,9 @@ server.register('fully_initialize', (obj) =>
 
 	biapi.setup(gethCfg);
 	ipfsi.init(ipfsCfg);
+	pubsub = (pubsub instanceof Pubsub) ? pubsub : new Pubsub(ps2pCfg);
+
+	let ps2pChk = pubsub.initialized;
 
 	let reqs = 
 	[
@@ -1645,7 +1648,8 @@ server.register('fully_initialize', (obj) =>
 				return false;
 			}
 	        }),
-		ipfsChk ? true : ipfsi.start().then(() => { return true; })
+		ipfsChk ? true : ipfsi.start().then(() => { return true; }),
+		ps2pChk ? true : Promise.resolve(pubsub.connectP2P()).then(() => { return true; })
 	];
 
 	return Promise.all(reqs);
