@@ -1790,8 +1790,12 @@ server.event('synctokens', '/controlPanel');
 
 process.on('SIGINT', () => {
    console.log("\tRPC Server stopping ...");
-   pubsub.leave();
-   pubsub.swarm.close();
+
+   if (pubsub instanceof Pubsub && pubsub.initialized) {
+	console.log("\tPubsub Server stopping ...");
+   	pubsub.gossip.stop();
+   	pubsub.swarm.close();
+   }
 
    if (typeof(ipfsi.controller) !== 'undefined' && ipfsi.controller.started) {
 	console.log("\tIPFS Server stopping ...");
