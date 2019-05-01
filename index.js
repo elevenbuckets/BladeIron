@@ -1550,7 +1550,7 @@ server.register('pubsub_subscribe', (args) =>
 	let topic = args[0];
 
 	__pubsub_handler = (msg) => {
-		return server.emit('pubsub_incomming', {topic, msg, timestamp: Date.now()});
+		return server.emit('pubsub_incomming', {...msg.data, timestamp: Date.now()});
 	}
 
 	const __promise_pubsub = (topic) => (resolve, reject) => 
