@@ -15,6 +15,8 @@ const ipfsctl = require('ipfsd-ctl');
 const ipfsAPI = require('ipfs-http-client');
 const { execFileSync } = require('child_process');
 const ethUtils = require('ethereumjs-utils');
+const EthTx = require('ethereumjs-tx');
+const { promisify } = require('util');
 
 // account manager
 const bcup  = require('buttercup');
@@ -95,7 +97,7 @@ class BladeIron {
                 };
 
 		this.abi  = abi;
-		this.ipc3 = new Web3();
+		this.toHex   = (input) => { return this.web3.toHex(input) };
 
 		this.CUE = { 'Web3': { 'ETH': {'sendTransaction': this.web3.eth.sendTransaction } }, 'Token': {} };
                 Object.keys(allConditions).map( (f) => { if(typeof(this[f]) === 'undefined') this[f] = allConditions[f] } );
@@ -106,7 +108,6 @@ class BladeIron {
 			this.allocated = {};
 			this.configs = cfgobj;
 	                this.rpcAddr = this.configs.rpcAddr || null;
-        	        this.ipcPath = this.configs.ipcPath || null;
 			this.networkID = this.configs.networkID || 'NO_CONFIG';
 	                this.condition = this.configs.condition || null; // 'sanity' or 'fulfill'
 	                this.archfile  = this.configs.passVault || null;
@@ -195,31 +196,7 @@ class BladeIron {
 	
 	                return new Promise(__connectRPC);
 	        }
-	
-		this.connectIPC = () => 
-		{
-	                const __connectIPC = (resolve, reject) => {
-	                        try {
-	                                if (
-	                                    this.ipc3 instanceof Web3
-	                                 && this.ipc3.net._requestManager.provider instanceof Web3.providers.IpcProvider
-	                                ) {
-	                                        resolve(true);
-	                                } else if (this.ipc3 instanceof Web3) {
-	                                        this.ipc3.setProvider(new Web3.providers.IpcProvider(this.ipcPath, net));
-	                                        resolve(true);
-	                                } else {
-	                                        reject(false);
-	                                }
-	                        } catch (err) {
-	                                console.log(err);
-	                                reject(false);
-	                        }
-	                }
-	
-	                return new Promise(__connectIPC);
-	        }	
-	
+
 		this.connect = () => {
 	                let stage = Promise.resolve();
 	
@@ -229,7 +206,7 @@ class BladeIron {
 	                .then((rc) => {
 	                        if (rc) {
 					this.TokenABI  = this.web3.eth.contract(EIP20ABI);
-	                                return this.connectIPC();
+					return rc;
 	                        } else {
 	                                throw("no connection");
 	                        }
@@ -242,7 +219,21 @@ class BladeIron {
 	                return stage;
 	        }
 	
-		this.allAccounts = () => { return this.web3.eth.accounts; }
+		//this.allAccounts = () => { return this.web3.eth.accounts; } // should parse local keystore files and collect addresses instead
+		this.allAccounts = () =>
+		{
+			const readdir = promisify(fs.readdir);
+			const readfile = promisify(fs.readFile);
+			let keydir = path.join(this.configs.datadir, 'keystore');
+			return readdir(keydir).then((list) => 
+			{
+				let p = list.map((f) => { return readfile(path.join(keydir,f)).then((b) => { 
+					return '0x' + JSON.parse(b.toString()).address }).catch((e) => { return null });  
+				});
+
+				return Promise.all(p).then((results) => { let r = results.filter((i) => { return i !== null }); return Array.from(new Set(r)) });
+			})
+		}
 
 		this.ethNetStatus = () =>
 	        {
@@ -336,23 +327,6 @@ class BladeIron {
 	        this.toWei = (eth, decimals) => new BigNumber(String(eth)).times(new BigNumber(10 ** decimals)).floor();
         	this.hex2num = (hex) => new BigNumber(String(hex)).toString();
 
-		this.unlockViaIPC = passwd => addr =>
-	        {
-	                const __unlockToExec = (resolve, reject) => {
-	                        this.ipc3.personal.unlockAccount(addr, passwd, 120, (error, result) => {
-	                                if (error) {
-	                                        reject(error);
-	                                } else if (result != true) {
-	                                        setTimeout( () => __unlockToExec(resolve, reject), 500 );
-	                                } else {
-	                                        resolve(true);
-	                                }
-	                        });
-	                };
-	
-	                return new Promise(__unlockToExec);
-	        }
-
 		this.configured = () => 
 		{
                 	if (this.networkID === 'NO_CONFIG') {
@@ -361,29 +335,6 @@ class BladeIron {
                         	return true;
                 	}
         	}
-
-		this.closeIPC = () =>
-	        {
-	                const __closeIPC = (resolve, reject) => {
-	                        try {
-	                                if (
-	                                    this.ipc3 instanceof Web3
-	                                 && this.ipc3.net._requestManager.provider instanceof Web3.providers.IpcProvider
-	                                ) {
-	                                        console.log("Shutdown ipc connection!!!");
-	                                        resolve(this.ipc3.net._requestManager.provider.connection.destroy());
-	                                } else if (this.ipc3 instanceof Web3) {
-	                                        console.log("Still pending to shutdown ipc connection!!!");
-	                                        setTimeout( () => __closeIPC(resolve, reject), 500 );
-	                                }
-	                        } catch (err) {
-	                                console.log("Uh Oh...... (closeIPC)" + err);
-	                                reject(false);
-	                        }
-	                };
-	
-	                return new Promise(__closeIPC);
-	        }
 
 		this.connected = () => 
 		{
@@ -429,11 +380,11 @@ class BladeIron {
 		this.gasCostEst = (addr, txObj) =>
 	        {
 	                if (
-	                        txObj.hasOwnProperty('gas') == false
+	                        txObj.hasOwnProperty('gasLimit') == false
 	                     || txObj.hasOwnProperty('gasPrice') == false
 	                ) { throw new Error("txObj does not contain gas-related information"); }
 	
-	                let gasBN = this.web3.toBigNumber(txObj.gas);
+	                let gasBN = this.web3.toBigNumber(txObj.gasLimit);
 	                let gasPriceBN = this.web3.toBigNumber(txObj.gasPrice);
 	                let gasCost = gasBN.mul(gasPriceBN);
 	
@@ -556,7 +507,9 @@ class BladeIron {
 		                	}
 		
 			                results = results.then( () => {
-		        	                return this.unlockViaIPC(passes)(addr).then(() => {
+		        	                return recover(addr, passes, this.configs.datadir).then((p) => {
+                                                if(!p.rc) throw "failed to unlock account";
+
 							let fatal = false;
 		                	                this.jobQ[Q][addr].map((o, id) => 
 							{
@@ -564,27 +517,42 @@ class BladeIron {
 									if (fatal) throw "previous job in queue failed, Abort!";
 									if (typeof(o.cfc) !== 'undefined') throw `job failed to pass condition ${o.cfc}`;
 								
-			                        	        	let tx = this.CUE[o.type][o.contract][o.call](...o.args, o.txObj);
-									console.debug(`QID: ${Q} | ${o.type}: ${addr} doing ${o.call} on ${o.contract}, txhash: ${tx}`);
+			                        	        	//let tx = this.CUE[o.type][o.contract][o.call](...o.args, o.txObj);
+
+			                        	        	let data;
+			                        	        	let tx;
+									let nonce = this.web3.eth.getTransactionCount(addr);
+									nonce = nonce + id;
+		                       	        			if (o.type !== 'Web3') {
+		                       	        				data = this.CUE[o.type][o.contract][o.call].getData(...o.args);
+										tx = new EthTx({ ...o.txObj, nonce, data, chainID: this.networkID});
+									} else {
+										tx = new EthTx({ ...o.txObj, nonce, chainID: this.networkID});
+									}
+									tx.sign(p.pkey);
+									let txHash = this.web3.eth.sendRawTransaction(ethUtils.bufferToHex(tx.serialize()));
 
 								  	if (typeof(o['amount']) !== 'undefined') {
-								    		this.rcdQ[Q].push({id, addr, tx, 
+								    		this.rcdQ[Q].push({id, addr, 
+											'tx': txHash, 
 											'type': o.type, 
 											'contract': o.contract, 
 											'call': o.call, ...o.txObj, 
 											'amount': o.amount
 										});
 								  	} else {
-								    		this.rcdQ[Q].push({id, addr, tx, 
+								    		this.rcdQ[Q].push({id, addr, 
+											'tx': txHash, 
 											'type': o.type, 
 											'contract': o.contract, 
 											'call': o.call, ...o.txObj,
-										        'amount': null
+									        	'amount': null
 										});
 								  	}
 								} catch(error) {
 									console.trace(error);
-									this.rcdQ[Q].push({id, addr, error,
+									this.rcdQ[Q].push({id, addr, 
+										'error': error.toString(),
 										'tx': '0x0000000000000000000000000000000000000000000000000000000000000000',
 									        'type': o.type, 
 									        'contract': o.contract, 
@@ -594,24 +562,7 @@ class BladeIron {
 									fatal = true;
 								}
 		                                	})
-			                        }).then( () => {
-		        	                        this.ipc3.personal.lockAccount(addr, (error, r) => {
-		                        	                if (error) {
-									console.trace(error);
-									this.rcdQ[Q].push({
-									  	'id': null, addr, error,
-									  	'tx': '0x0000000000000000000000000000000000000000000000000000000000000000', 
-									  	'type': 'ipc3', 
-									  	'contract': 'personal', 
-									  	'call': 'lockAccount',
-									  	'amount': null
-								  	});
-								}
-		
-		                	                        console.debug(`** account: ${addr} is now locked`);
-								delete this.jobQ[Q][addr];
-			                                });
-		        	                })
+			                        }).then( () => { delete this.jobQ[Q][addr]; })
 		                	}).catch( (error) => { console.trace(error); delete this.jobQ[Q][addr]; return Promise.resolve(); } );
 		        	}); 
 			
@@ -631,9 +582,9 @@ class BladeIron {
 	
 			const __closeQ = (resolve, reject) => {
 				if (Object.keys(this.jobQ[Q]).length == 0) {
-					delete this.jobQ[Q];
+					delete this.jobQ[Q]; console.log(`DEBUG: Resolving ${Q}`)
 					resolve(Q);
-				} else if (Object.keys(this.jobQ[Q]).length > 0 && this.ipc3 && this.ipc3.hasOwnProperty('net') == true){
+				} else if (Object.keys(this.jobQ[Q]).length > 0 && this.connected()) {
 					setTimeout( () => __closeQ(resolve, reject), 500 );
 				} else {
 					console.error("Uh Oh...... (closeQ)");
@@ -722,7 +673,7 @@ class BladeIron {
 		
 							console.debug(` - Account: ${jobWallet}; Balance: ${userBalance} ETH`);
 		
-							let gasCost = new BigNumber(job.txObj.gas).times(this.gasPrice); 
+							let gasCost = new BigNumber(job.txObj.gasLimit).times(this.gasPrice); 
 		
 							if (
 							        typeof(this.TokenList[job.contract]) === 'undefined'
@@ -800,9 +751,10 @@ class BladeIron {
 					contract: 'ETH',
 					call: 'sendTransaction',
 					args: [],
-					txObj: { from: fromWallet, to: toAddress, value: amount, gas: gasAmount, gasPrice: this.gasPrice } 
+					txObj: { from: fromWallet, to: toAddress, value: this.toHex(amount), gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) } 
 				}
 			} else {
+				let tokenAddr = this.CUE['Token'][tokenSymbol].address;
 				return {
 					Q: undefined,
 					type: 'Token',
@@ -811,7 +763,7 @@ class BladeIron {
 					args: ['toAddress', 'amount'],
 					toAddress,
 					amount,
-					txObj: { from: fromWallet, gas: gasAmount, gasPrice: this.gasPrice }
+					txObj: { from: fromWallet, to: tokenAddr, gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) }
 				}
 			}
 		}
@@ -841,11 +793,13 @@ class BladeIron {
 	                ){
 	                        throw "enqueueTk: Invalid element in txObj";
 	                };
+
+			let toAddress = this.CUE[type][contract].address;
 	
 	                if (amount === null) {
-	                        txObj = { from: fromWallet, gas: gasAmount, gasPrice: this.gasPrice }
+	                        txObj = { from: fromWallet, to: toAddress, gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) }
 	                } else if (amount > 0) {
-	                        txObj = { from: fromWallet, value: amount, gas: gasAmount, gasPrice: this.gasPrice }
+	                        txObj = { from: fromWallet, to: toAddress, value: this.toHex(amount), gasLimit: this.toHex(gasAmount), gasPrice: this.toHex(this.gasPrice) }
 	                }
 	
 	                return { Q: undefined, type, contract, call, args, ...tkObj, txObj };
@@ -932,7 +886,7 @@ class IPFS_Blade {
 		this.init = (cfgobj) => {
 			try {
                         	this.cfsrc = cfgobj;
-                        	this.options = {args: ['--enable-pubsub-experiment'], disposable: false, init: true, repoPath: this.cfsrc.repoPathGo};
+                        	this.options = {args: [], disposable: false, init: true, repoPath: this.cfsrc.repoPathGo};
 
                         	if (typeof(this.cfsrc.ipfsBinary) === 'undefined') {
                                 	let goipfspath = path.dirname(path.dirname(require.resolve('go-ipfs-dep')));
@@ -945,7 +899,7 @@ class IPFS_Blade {
                                 	lockerpathgo: '/tmp/.locker_go',
                                 	ipfsBinary: __asar_unpacked(path.join(goipfspath, 'go-ipfs', 'ipfs'))
                         	};
-                        	this.options = {args: ['--enable-pubsub-experiment'], disposable: true, init: true, repoPath: this.cfsrc.repoPathGo};
+                        	this.options = {args: [], disposable: true, init: true, repoPath: this.cfsrc.repoPathGo};
                 	}
 
                 	if (this.options.disposable === false && fs.existsSync(this.cfsrc.lockerpathgo)) this.options.init = false;
@@ -1363,14 +1317,10 @@ server.register('gasPriceEst', () =>
 server.register('canUseAccount', (args) =>
 {
 	let address = args[0];
-                if (biapi.allAccounts().indexOf(address) === -1) return Promise.reject('Account not found');
-
-                try {
-                        return biapi.managedAddress(address);
-                } catch(err) {
+        return biapi.managedAddress(address).catch((err) => {
 		console.log(err);
-                        return Promise.reject(err);
-                }	
+                return false;
+	})
 });
 
 server.event('newJobs');
@@ -1402,12 +1352,9 @@ server.register('addrEtherBalance', (args = null) => // addrEtherBalance(address
 			return Promise.reject(err);
 		}
 	} else {
-		let addressList = biapi.allAccounts();
-		try {
+		return biapi.allAccounts().then((addressList) => {
 			return Promise.all(addressList.map((addr) => { return {[addr]: biapi.addrEtherBalance(addr)} }));
-		} catch(err) {
-			return Promise.reject(err);
-		}
+		}).catch((err) => { return err; })
 	}
 });
 
@@ -1592,75 +1539,70 @@ server.register('ipfs_swarm_disconnect', (args) =>
 	return ipfsi.swarmDisconnect(multiAddr);
 });
 
-// IPFS PUBSUB related
-server.event('ipfs_pubsub_incomming');
-let __ipfs_pubsub_handler;
-let pubsub_topics = {};
+// PUBSUB related 
+const Pubsub = require('./pubsubNode.js');
+let __pubsub_handler;
+let pubsub;
 
-server.register('ipfs_pubsub_subscribe', (args) => 
+server.event('pubsub_incomming');
+server.register('pubsub_subscribe', (args) => 
 {	
 	let topic = args[0];
 
-	if (topic in pubsub_topics) return true;
-
-	__ipfs_pubsub_handler = (msg) => { 
-		return server.emit('ipfs_pubsub_incomming', {topic, msg, timestamp: Date.now()});
+	__pubsub_handler = (msg) => {
+		return server.emit('pubsub_incomming', {...msg.data, timestamp: Date.now()});
 	}
 
-	const __promise_ipfs_pubsub = (topic) => (resolve, reject) => 
+	const __promise_pubsub = (topic) => (resolve, reject) => 
 	{
-		ipfsi.ipfsAPI.pubsub.subscribe(topic, __ipfs_pubsub_handler, {discover: true}, (err) => 
-		{ 
-			if (err) {
-				reject(err);
-			} else {
-				pubsub_topics[topic] = true;
-				resolve(true);
-			}
-		})
+		try {
+			pubsub.join(topic);
+			pubsub.setIncommingHandler(__pubsub_handler); 
+			resolve(true);
+		} catch (err) {
+			console.trace(err); 
+			reject(err);
+		}
 	}
 
-	return new Promise(__promise_ipfs_pubsub(topic));
+	return new Promise(__promise_pubsub(topic));
 });
 
-server.register('ipfs_pubsub_unsubscribe', (args) => 
+server.register('pubsub_unsubscribe', (args) => 
 {
 	let topic = args[0];
 
-	const __promise_ipfs_unpubsub = (topic) => (resolve, reject) => 
+	const __promise_unpubsub = (topic) => (resolve, reject) => 
 	{
-		ipfsi.ipfsAPI.pubsub.unsubscribe(topic, __ipfs_pubsub_handler, (err) => 
-		{ 
-			if (err) {
-				reject(err);
-			} else {
-				delete pubsub_topics[topic];
-				resolve(true);
-			}
-		})
+		try {
+			pubsub.leave(topic);
+			pubsub.removeAllListeners(topic);
+			resolve(true);
+		} catch (err) {
+			console.trace(err);
+			reject(false);
+		}
 	}
 
-	return new Promise(__promise_ipfs_unpubsub(topic));
+	return new Promise(__promise_unpubsub(topic));
 });
 
-server.register('ipfs_pubsub_publish', (args) => 
+server.register('pubsub_publish', (args) => 
 {
 	let topic = args[0];
 	let data  = Buffer.from(args[1], 'utf8');
 
-	const __promise_ipfs_pubsub_data = (topic) => (data) => (resolve, reject) => 
+	const __promise_pubsub_data = (topic) => (data) => (resolve, reject) => 
 	{
-		ipfsi.ipfsAPI.pubsub.publish(topic, data, (err) => 
-		{ 
-			if (err) {
-				reject(err);
-			} else {
-				resolve(true);
-			}
-		})
+		try {
+			resolve(pubsub.publish(topic, data)); 
+		} catch (err) {
+			console.trace(err);
+			reject(false);
+		} 
 	}
 
-	return new Promise(__promise_ipfs_pubsub_data(topic)(data));
+	return new Promise(__promise_pubsub_data(topic)(data));
 });
 
 server.register('full_checks', () =>
@@ -1675,16 +1617,18 @@ server.register('fully_initialize', (obj) =>
 {
 	let gethCfg = obj.geth;
 	let ipfsCfg = obj.ipfs;
+	let ps2pCfg = obj.pubsub;
 	let gethChk = biapi.connected();
 	let ipfsChk = typeof(ipfsi.ipfsd) !== 'undefined' && ipfsi.ready && ipfsi.controller.started;
 
-	console.log("DEBUG:");
-	console.log(obj);
-	console.log({gethChk});
-	console.log({ipfsChk});
+	console.log("Received Configs:");
+	console.dir(obj);
 
 	biapi.setup(gethCfg);
 	ipfsi.init(ipfsCfg);
+	pubsub = (pubsub instanceof Pubsub) ? pubsub : new Pubsub(ps2pCfg);
+
+	let ps2pChk = pubsub.initialized;
 
 	let reqs = 
 	[
@@ -1699,7 +1643,8 @@ server.register('fully_initialize', (obj) =>
 				return false;
 			}
 	        }),
-		ipfsChk ? true : ipfsi.start().then(() => { return true; })
+		ipfsChk ? true : ipfsi.start().then(() => { return true; }),
+		ps2pChk ? true : Promise.resolve(pubsub.connectP2P()).then(() => { return true; })
 	];
 
 	return Promise.all(reqs);
@@ -1840,6 +1785,13 @@ server.event('synctokens', '/controlPanel');
 
 process.on('SIGINT', () => {
    console.log("\tRPC Server stopping ...");
+
+   if (pubsub instanceof Pubsub && pubsub.initialized) {
+	console.log("\tPubsub Server stopping ...");
+   	pubsub.gossip.stop();
+   	pubsub.swarm.close();
+   }
+
    if (typeof(ipfsi.controller) !== 'undefined' && ipfsi.controller.started) {
 	console.log("\tIPFS Server stopping ...");
 	ipfsi.stop().then(() => {
